@@ -1,59 +1,97 @@
-//
-//  ContentView.swift
-//  HabitEndevor
-//
-//  Created by 류성균 on 5/6/26.
-//
-
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query private var settingsArray: [AppSettings]
+
+    private var colorScheme: ColorScheme? {
+        guard let s = settingsArray.first else { return nil }
+        return s.prefersDarkMode ? .dark : .light
+    }
+
+    var body: some View {
+        Group {
+            #if os(macOS)
+            MacContentView()
+            #else
+            IOSContentView()
+            #endif
+        }
+        .preferredColorScheme(colorScheme)
+        .tint(.primary)
+    }
+}
+
+// MARK: - iOS / iPadOS
+
+struct IOSContentView: View {
+    var body: some View {
+        TabView {
+            NavigationStack { CheckboxView() }
+                .tabItem { Label("체크박스", systemImage: "checkmark.square") }
+
+            NavigationStack { RecordsView() }
+                .tabItem { Label("기록", systemImage: "chart.bar") }
+
+            NavigationStack { WorldView() }
+                .tabItem { Label("세계", systemImage: "globe") }
+
+            NavigationStack { SettingsView() }
+                .tabItem { Label("설정", systemImage: "gearshape") }
+        }
+    }
+}
+
+// MARK: - macOS
+
+struct MacContentView: View {
+    @State private var selectedTab: AppTab = .checkbox
 
     var body: some View {
         NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
+            List(AppTab.allCases, selection: $selectedTab) { tab in
+                Label(tab.title, systemImage: tab.icon).tag(tab)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
+            .navigationSplitViewColumnWidth(min: 160, ideal: 200)
         } detail: {
-            Text("Select an item")
-        }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            NavigationStack {
+                switch selectedTab {
+                case .checkbox: CheckboxView()
+                case .records:  RecordsView()
+                case .world:    WorldView()
+                case .settings: SettingsView()
+                }
             }
+        }
+    }
+}
+
+// MARK: - Tab Model
+
+enum AppTab: String, CaseIterable, Identifiable {
+    case checkbox, records, world, settings
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .checkbox: "체크박스"
+        case .records:  "기록"
+        case .world:    "세계"
+        case .settings: "설정"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .checkbox: "checkmark.square"
+        case .records:  "chart.bar"
+        case .world:    "globe"
+        case .settings: "gearshape"
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: AppSettings.self, inMemory: true)
 }

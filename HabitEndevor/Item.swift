@@ -1,18 +1,2 @@
-//
-//  Item.swift
-//  HabitEndevor
-//
-//  Created by 류성균 on 5/6/26.
-//
-
-import Foundation
-import SwiftData
-
-@Model
-final class Item {
-    var timestamp: Date
-    
-    init(timestamp: Date) {
-        self.timestamp = timestamp
-    }
-}
+// 이 파일은 더 이상 사용하지 않습니다.
+// SwiftData 모델은 Habit.swift, HabitRecord.swift, PurchasedCountry.swift, AppSettings.swift 를 사용하세요.

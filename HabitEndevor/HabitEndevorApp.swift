@@ -12,7 +12,10 @@ import SwiftData
 struct HabitEndevorApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Habit.self,
+            HabitRecord.self,
+            PurchasedCountry.self,
+            AppSettings.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -26,7 +29,18 @@ struct HabitEndevorApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task { seedSettingsIfNeeded() }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    // AppSettings가 없으면 기본값으로 생성
+    private func seedSettingsIfNeeded() {
+        let context = sharedModelContainer.mainContext
+        let count = (try? context.fetchCount(FetchDescriptor<AppSettings>())) ?? 0
+        if count == 0 {
+            context.insert(AppSettings())
+            try? context.save()
+        }
     }
 }
