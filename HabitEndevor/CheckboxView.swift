@@ -12,7 +12,6 @@ struct CheckboxView: View {
 
     @State private var showAddHabit = false
     @State private var selectedRecord: HabitRecord?
-    // Maps habitID → date of the cell that just got checked (for particle burst)
     @State private var burstMap: [PersistentIdentifier: Date] = [:]
 
     private var settings: AppSettings {
@@ -98,6 +97,18 @@ struct CheckboxView: View {
                 context: modelContext
             )
         }
+        .onAppear { assignMissingColors() }
+    }
+
+    // 색상 없는 습관에 팔레트 색상 자동 배정
+    private func assignMissingColors() {
+        let active = habits.filter(\.isActive)
+        var changed = false
+        for (idx, habit) in active.enumerated() where habit.colorHex == nil {
+            habit.colorHex = habitColorPalette[idx % habitColorPalette.count]
+            changed = true
+        }
+        if changed { try? modelContext.save() }
     }
 
     // MARK: - Current Date Header
@@ -172,9 +183,10 @@ struct CheckboxView: View {
                 .fontWeight(.bold)
                 .padding(.top, 12)
 
-            ForEach(habits.filter(\.isActive)) { habit in
-                HabitStatsCard(habit: habit, records: records(for: habit))
-            }
+            CombinedHeatmapGrid(
+                habits: habits.filter(\.isActive),
+                allRecords: allRecords
+            )
 
             HabitTrendChart(
                 habits: habits.filter(\.isActive),
@@ -547,6 +559,97 @@ struct RingProgressView: View {
             }
         }
         .frame(width: 46, height: 46)
+    }
+}
+
+// MARK: - Combined Heatmap Grid (one square containing all habit heatmaps)
+
+struct CombinedHeatmapGrid: View {
+    let habits: [Habit]
+    let allRecords: [HabitRecord]
+
+    private let gridCols = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("28일 히트맵")
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.semibold)
+
+            if habits.isEmpty {
+                Text("습관을 추가해보세요")
+                    .font(.subheadline).foregroundStyle(Color.secondary)
+            } else {
+                LazyVGrid(columns: gridCols, spacing: 8) {
+                    ForEach(habits) { habit in
+                        HabitMiniCard(
+                            habit: habit,
+                            records: allRecords.filter {
+                                $0.habit?.persistentModelID == habit.persistentModelID
+                            }
+                        )
+                        .aspectRatio(1, contentMode: .fit)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.cardBackground)
+                .shadow(color: .black.opacity(0.07), radius: 6, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+        )
+    }
+}
+
+struct HabitMiniCard: View {
+    let habit: Habit
+    let records: [HabitRecord]
+
+    private var heatmapCells: [DayCellData] {
+        let cal = Calendar.current
+        return (0..<28).reversed().map { offset in
+            let date = cal.date(byAdding: .day, value: -offset, to: Date.todayStart)!
+            let rec = records.first { $0.date == date }
+            return DayCellData(date: date, mark: rec.map { $0.isChecked ? .checked : .failed } ?? .empty)
+        }
+    }
+
+    private var streak: Int { StreakService.currentStreak(for: habit) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 4) {
+                Text(habit.emoji).font(.system(size: 12))
+                Text(habit.name)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                Spacer()
+                HStack(spacing: 2) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.orange)
+                    Text("\(streak)일")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            BentoHeatmap(cells: heatmapCells, accentColor: habit.displayColor)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(habit.displayColor.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(habit.displayColor.opacity(0.3), lineWidth: 1)
+        )
     }
 }
 
