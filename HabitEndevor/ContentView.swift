@@ -47,6 +47,7 @@ struct IOSContentView: View {
 
 // MARK: - macOS
 
+#if os(macOS)
 struct MacContentView: View {
     @State private var selectedTab: AppTab = .checkbox
 
@@ -69,6 +70,7 @@ struct MacContentView: View {
         }
     }
 }
+#endif
 
 // MARK: - Tab Model
 
