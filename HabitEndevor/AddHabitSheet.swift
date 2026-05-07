@@ -65,7 +65,7 @@ struct AddHabitSheet: View {
             }
         }
         #if os(iOS)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         #endif
     }
 

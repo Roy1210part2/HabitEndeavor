@@ -78,9 +78,9 @@ struct RecordsView: View {
 
     private var overallStatsCard: some View {
         HStack(spacing: 0) {
-            statItem(value: "\(totalCheckins)",            label: "총 체크인")
+            statItem(value: "\(totalCheckins)",            label: "총 습관 성공")
             Divider().frame(height: 44)
-            statItem(value: "\(bestCurrentStreak)일",     label: "최고 스트릭")
+            statItem(value: "\(bestCurrentStreak)일",     label: "최고 연속기록")
             Divider().frame(height: 44)
             statItem(value: "\(Int(overallRate * 100))%", label: "전체 달성률")
         }
@@ -107,7 +107,7 @@ struct RecordsView: View {
             sectionHeader("습관 비율")
 
             if pieChartData.isEmpty {
-                Text("습관을 추가하고 체크인하면 차트가 나타납니다.")
+                Text("습관을 추가하고 습관을 성공하면 차트가 나타납니다.")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondary)
                     .padding(.horizontal, 16)
@@ -116,7 +116,7 @@ struct RecordsView: View {
                 HStack(alignment: .center, spacing: 20) {
                     Chart(pieChartData) { item in
                         SectorMark(
-                            angle: .value("체크인", item.count),
+                            angle: .value("습관 성공", item.count),
                             innerRadius: .ratio(0.48),
                             angularInset: 2.5
                         )
@@ -162,7 +162,7 @@ struct RecordsView: View {
 
     private var habitStreakList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("습관별 스트릭 & 성공률")
+            sectionHeader("습관별 연속기록 & 성공률")
 
             ForEach(activeHabits) { habit in
                 HabitStreakRow(habit: habit)
@@ -512,21 +512,36 @@ struct WeeklyReviewSheet: View {
                 #endif
                 .animation(.easeInOut(duration: 0.35), value: page)
 
-                // 버튼
-                Button {
-                    if page < pageCount - 1 {
-                        withAnimation { page += 1 }
-                    } else {
-                        dismiss()
+                // 이전 / 다음 버튼
+                HStack(spacing: 12) {
+                    if page > 0 {
+                        Button {
+                            withAnimation { page -= 1 }
+                        } label: {
+                            Text("← 이전")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white.opacity(0.8))
+                                .frame(width: 90)
+                                .padding(.vertical, 14)
+                                .background(Capsule().fill(.white.opacity(0.2)))
+                        }
                     }
-                } label: {
-                    Text(page < pageCount - 1 ? "다음 →" : "완료")
-                        .font(.system(.body, design: .rounded))
-                        .fontWeight(.bold)
-                        .foregroundStyle(gradients[page].first ?? .blue)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Capsule().fill(.white))
+                    Button {
+                        if page < pageCount - 1 {
+                            withAnimation { page += 1 }
+                        } else {
+                            dismiss()
+                        }
+                    } label: {
+                        Text(page < pageCount - 1 ? "다음 →" : "완료")
+                            .font(.system(.body, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundStyle(gradients[page].first ?? .blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Capsule().fill(.white))
+                    }
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 36)
@@ -638,71 +653,74 @@ struct WeeklyChartPage: View {
     let thisWeekDates: [Date]
     let allRecords: [HabitRecord]
 
-    struct DayPoint: Identifiable {
+    struct PieSlice: Identifiable {
         let id = UUID()
-        let habitName: String
+        let label: String
+        let value: Double
         let color: Color
-        let dayIndex: Int
-        let rate: Double
     }
 
-    private var points: [DayPoint] {
-        habits.flatMap { habit in
-            let recs = allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
-            return thisWeekDates.enumerated().map { idx, date in
-                let checked = recs.first { $0.date == date }?.isChecked == true
-                return DayPoint(
-                    habitName: "\(habit.emoji) \(habit.name)",
-                    color: habit.displayColor,
-                    dayIndex: idx,
-                    rate: checked ? 1.0 : 0.0
-                )
-            }
-        }
+    private func habitRate(_ habit: Habit) -> Double {
+        let recs = allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
+        let checked = thisWeekDates.filter { d in recs.first { $0.date == d }?.isChecked == true }.count
+        return Double(checked) / Double(max(thisWeekDates.count, 1))
     }
 
-    private let dayLabels = ["월", "화", "수", "목", "금", "토", "일"]
+    private var overallRate: Double {
+        guard !habits.isEmpty else { return 0 }
+        return habits.reduce(0.0) { $0 + habitRate($1) } / Double(habits.count)
+    }
+
+    private var slices: [PieSlice] {
+        [
+            PieSlice(label: "달성", value: max(overallRate, 0.001),
+                     color: Color(hex: "#2ED573") ?? .green),
+            PieSlice(label: "미달성", value: max(1 - overallRate, 0.001),
+                     color: .white.opacity(0.15))
+        ]
+    }
 
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
-            Text("이번 주 그래프").font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(.white.opacity(0.8))
+            Text("이번 주 총 달성률").font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(.white.opacity(0.8))
 
-            Chart {
-                ForEach(habits) { habit in
-                    let pts = points.filter { $0.habitName == "\(habit.emoji) \(habit.name)" }
-                    ForEach(pts) { p in
-                        BarMark(x: .value("요일", p.dayIndex), y: .value("달성", p.rate))
-                            .foregroundStyle(habit.displayColor)
-                            .cornerRadius(4)
-                    }
-                    .foregroundStyle(by: .value("습관", "\(habit.emoji) \(habit.name)"))
+            ZStack {
+                Chart(slices) { s in
+                    SectorMark(angle: .value("비율", s.value),
+                               innerRadius: .ratio(0.55),
+                               angularInset: 1.5)
+                    .cornerRadius(5)
+                    .foregroundStyle(s.color)
                 }
-            }
-            .chartXAxis {
-                AxisMarks(values: Array(0..<thisWeekDates.count)) { val in
-                    AxisValueLabel {
-                        if let v = val.as(Int.self), v < dayLabels.count {
-                            Text(dayLabels[v]).font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
-                        }
-                    }
-                }
-            }
-            .chartYAxis(.hidden)
-            .chartLegend(.hidden)
-            .frame(height: 160)
-            .padding(.horizontal, 16)
+                .frame(width: 170, height: 170)
 
-            // Legend
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                VStack(spacing: 0) {
+                    Text("\(Int(overallRate * 100))")
+                        .font(.system(size: 50, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("%")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
+
+            VStack(spacing: 8) {
                 ForEach(habits) { habit in
-                    HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 2).fill(habit.displayColor).frame(width: 16, height: 3)
-                        Text("\(habit.emoji) \(habit.name)").font(.system(size: 10, design: .rounded)).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
+                    HStack(spacing: 8) {
+                        Circle().fill(habit.displayColor).frame(width: 8, height: 8)
+                        Text("\(habit.emoji) \(habit.name)")
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(Int(habitRate(habit) * 100))%")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
                     }
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 36)
 
             Spacer()
             Spacer()

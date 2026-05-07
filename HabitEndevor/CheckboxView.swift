@@ -104,9 +104,15 @@ struct CheckboxView: View {
     private func assignMissingColors() {
         let active = habits.filter(\.isActive)
         var changed = false
-        for (idx, habit) in active.enumerated() where habit.colorHex == nil {
-            habit.colorHex = habitColorPalette[idx % habitColorPalette.count]
-            changed = true
+        for (idx, habit) in active.enumerated() {
+            if habit.colorHex == nil {
+                habit.colorHex = habitColorPalette[idx % habitColorPalette.count]
+                changed = true
+            }
+            if habit.emoji == "✅" {           // 기존 기본 이모지 교체
+                habit.emoji = "⭐️"
+                changed = true
+            }
         }
         if changed { try? modelContext.save() }
     }
@@ -283,19 +289,21 @@ struct HabitRowView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(habit.emoji)
-                        .font(.body)
+            HStack(spacing: 8) {
+                // 색상 바
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(habit.displayColor)
+                    .frame(width: 4, height: 32)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(habit.name)
                         .font(.system(.body, design: .rounded))
                         .fontWeight(.semibold)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                    Text("\(Int(weeklyRate * 100))%")
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
                 }
-                Text("\(Int(weeklyRate * 100))%")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
             }
             .frame(width: 118, alignment: .leading)
 
@@ -568,32 +576,40 @@ struct CombinedHeatmapGrid: View {
     let habits: [Habit]
     let allRecords: [HabitRecord]
 
-    private let gridCols = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("28일 히트맵")
-                .font(.system(.subheadline, design: .rounded))
-                .fontWeight(.semibold)
+        GeometryReader { geo in
+            let size    = geo.size.width           // 정사각형 기준
+            let pad     = size * 0.06
+            let spacing = size * 0.04
+            let cols    = Array(repeating: GridItem(.flexible(), spacing: spacing), count: 2)
 
-            if habits.isEmpty {
-                Text("습관을 추가해보세요")
-                    .font(.subheadline).foregroundStyle(Color.secondary)
-            } else {
-                LazyVGrid(columns: gridCols, spacing: 8) {
-                    ForEach(habits) { habit in
-                        HabitMiniCard(
-                            habit: habit,
-                            records: allRecords.filter {
-                                $0.habit?.persistentModelID == habit.persistentModelID
-                            }
-                        )
-                        .aspectRatio(1, contentMode: .fit)
+            VStack(alignment: .leading, spacing: spacing * 0.6) {
+                Text("28일 히트맵")
+                    .font(.system(size: size * 0.045, weight: .semibold, design: .rounded))
+                    .padding(.top, pad * 0.5)
+
+                if habits.isEmpty {
+                    Text("습관을 추가해보세요")
+                        .font(.subheadline).foregroundStyle(Color.secondary)
+                } else {
+                    LazyVGrid(columns: cols, spacing: spacing) {
+                        ForEach(habits) { habit in
+                            HabitMiniCard(
+                                habit: habit,
+                                records: allRecords.filter {
+                                    $0.habit?.persistentModelID == habit.persistentModelID
+                                }
+                            )
+                            .aspectRatio(1, contentMode: .fit)
+                        }
                     }
                 }
             }
+            .padding(.horizontal, pad)
+            .padding(.bottom, pad)
+            .frame(width: size, height: size)
         }
-        .padding(14)
+        .aspectRatio(1, contentMode: .fit)   // 외부 정사각형 강제
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.cardBackground)
@@ -619,37 +635,42 @@ struct HabitMiniCard: View {
         }
     }
 
-    private var streak: Int { StreakService.currentStreak(for: habit) }
+    // records 파라미터를 직접 사용해 정확한 연속기록 계산
+    private var streak: Int {
+        var s = 0, day = Date.todayStart
+        let cal = Calendar.current
+        while records.first(where: { $0.date == day })?.isChecked == true {
+            s += 1
+            day = cal.date(byAdding: .day, value: -1, to: day)!
+        }
+        return s
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 4) {
-                Text(habit.emoji).font(.system(size: 12))
+        VStack(alignment: .leading, spacing: 4) {
+            // 이름 헤더
+            HStack(spacing: 3) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(habit.displayColor)
+                    .frame(width: 3, height: 14)
                 Text(habit.name)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .lineLimit(1)
-                Spacer()
-                HStack(spacing: 2) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.orange)
-                    Text("\(streak)일")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(.orange)
+                    .foregroundStyle(Color.primary)
+                Spacer(minLength: 0)
+                if streak > 0 {
+                    HStack(spacing: 1) {
+                        Image(systemName: "flame.fill").font(.system(size: 8)).foregroundStyle(.orange)
+                        Text("\(streak)").font(.system(size: 9, weight: .bold, design: .rounded)).foregroundStyle(.orange)
+                    }
                 }
             }
 
             BentoHeatmap(cells: heatmapCells, accentColor: habit.displayColor)
         }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(habit.displayColor.opacity(0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(habit.displayColor.opacity(0.3), lineWidth: 1)
-        )
+        .padding(7)
+        .background(RoundedRectangle(cornerRadius: 10).fill(habit.displayColor.opacity(0.06)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(habit.displayColor.opacity(0.3), lineWidth: 1))
     }
 }
 

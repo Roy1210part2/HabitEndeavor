@@ -110,7 +110,7 @@ struct SettingsForm: View {
                         .padding(.vertical, 4)
 
                         HStack {
-                            Text("스트릭 위기 알림 (22:00)").font(.body)
+                            Text("연속기록 위기 알림 (22:00)").font(.body)
                             Spacer()
                             Toggle("", isOn: streakRescueBinding)
                                 .labelsHidden()
@@ -205,7 +205,7 @@ struct SettingsForm: View {
                     DatePicker("알림 시간",
                                selection: notificationTime,
                                displayedComponents: .hourAndMinute)
-                    Toggle("스트릭 위기 알림 (22:00)", isOn: streakRescueBinding)
+                    Toggle("연속기록 위기 알림 (22:00)", isOn: streakRescueBinding)
                         .onChange(of: settings.streakRescueEnabled) { _, on in
                             (on ?? false) ? scheduleStreakRescue() : cancelStreakRescue()
                         }
@@ -274,7 +274,7 @@ struct SettingsForm: View {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: ["streak-rescue"])
         let content       = UNMutableNotificationContent()
-        content.title     = "⚡️ 스트릭이 위험해요!"
+        content.title     = "⚡️ 연속기록이 위험해요!"
         content.body      = "오늘 습관을 아직 완료하지 않으셨어요. 자정까지 2시간 남았어요!"
         content.sound     = .default
         var c             = DateComponents()
