@@ -42,6 +42,7 @@ struct IOSContentView: View {
             NavigationStack { SettingsView() }
                 .tabItem { Label("설정", systemImage: "gearshape") }
         }
+        .background(Color(.systemBackground).ignoresSafeArea())
     }
 }
 

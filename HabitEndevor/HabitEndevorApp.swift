@@ -5,6 +5,23 @@ import SwiftData
 struct HabitEndevorApp: App {
     var sharedModelContainer: ModelContainer = makeContainer()
 
+    init() {
+        #if os(iOS)
+        // TabBar와 NavigationBar가 safe area를 검은색으로 채우지 않도록 설정
+        let tabBar = UITabBarAppearance()
+        tabBar.configureWithDefaultBackground()
+        UITabBar.appearance().standardAppearance   = tabBar
+        UITabBar.appearance().scrollEdgeAppearance = tabBar
+
+        let navBar = UINavigationBarAppearance()
+        navBar.configureWithDefaultBackground()
+        UINavigationBar.appearance().standardAppearance        = navBar
+        UINavigationBar.appearance().scrollEdgeAppearance      = navBar
+        UINavigationBar.appearance().compactAppearance         = navBar
+        UINavigationBar.appearance().compactScrollEdgeAppearance = navBar
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
