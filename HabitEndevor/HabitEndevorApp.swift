@@ -1,30 +1,9 @@
-//
-//  HabitEndevorApp.swift
-//  HabitEndevor
-//
-//  Created by 류성균 on 5/6/26.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct HabitEndevorApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Habit.self,
-            HabitRecord.self,
-            PurchasedCountry.self,
-            AppSettings.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    var sharedModelContainer: ModelContainer = makeContainer()
 
     var body: some Scene {
         WindowGroup {
@@ -34,13 +13,47 @@ struct HabitEndevorApp: App {
         .modelContainer(sharedModelContainer)
     }
 
-    // AppSettings가 없으면 기본값으로 생성
     private func seedSettingsIfNeeded() {
         let context = sharedModelContainer.mainContext
         let count = (try? context.fetchCount(FetchDescriptor<AppSettings>())) ?? 0
         if count == 0 {
             context.insert(AppSettings())
             try? context.save()
+        }
+    }
+
+    // MARK: - Container Factory
+    //
+    // iCloud 연동 방법:
+    // 1. Xcode → Target → Signing & Capabilities → + Capability → iCloud
+    // 2. CloudKit 체크박스 활성화
+    // 3. Containers에 "iCloud.co.lyu.HabitEndevor" 추가
+    // 위 설정이 없으면 자동으로 로컬 저장소로 폴백됩니다.
+
+    private static func makeContainer() -> ModelContainer {
+        let schema = Schema([
+            Habit.self,
+            HabitRecord.self,
+            PurchasedCountry.self,
+            AppSettings.self,
+        ])
+
+        // CloudKit 동기화 시도 (.automatic은 entitlement에서 컨테이너를 자동 선택)
+        let cloudConfig = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .private("iCloud.co.lyu.HabitEndevor")
+        )
+        if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
+            return container
+        }
+
+        // CloudKit 미설정 시 로컬 저장소
+        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        do {
+            return try ModelContainer(for: schema, configurations: [localConfig])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
         }
     }
 }

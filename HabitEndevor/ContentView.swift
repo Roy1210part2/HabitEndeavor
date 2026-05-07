@@ -28,7 +28,7 @@ struct IOSContentView: View {
     var body: some View {
         TabView {
             NavigationStack { CheckboxView() }
-                .tabItem { Label("체크박스", systemImage: "checkmark.square") }
+                .tabItem { Label("체크박스", systemImage: "square.grid.2x2") }
 
             NavigationStack { RecordsView() }
                 .tabItem { Label("기록", systemImage: "chart.bar") }
@@ -52,7 +52,7 @@ struct MacContentView: View {
             List(AppTab.allCases, selection: $selectedTab) { tab in
                 Label(tab.title, systemImage: tab.icon).tag(tab)
             }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 200)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 210)
         } detail: {
             NavigationStack {
                 switch selectedTab {
@@ -83,7 +83,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .checkbox: "checkmark.square"
+        case .checkbox: "square.grid.2x2"
         case .records:  "chart.bar"
         case .world:    "globe"
         case .settings: "gearshape"

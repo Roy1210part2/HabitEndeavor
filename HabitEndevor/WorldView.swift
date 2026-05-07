@@ -80,8 +80,7 @@ struct WorldView: View {
             }
         }
         .padding(16)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardBackground()
     }
 
     // MARK: - 정복 진행도 카드 (내 아이디어: 전체 진행상황 한눈에)
@@ -137,8 +136,7 @@ struct WorldView: View {
             }
         }
         .padding(16)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardBackground()
     }
 
     // MARK: - 대륙 필터
@@ -197,14 +195,13 @@ struct WorldView: View {
                 }
             }
         }
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardBackground()
     }
 
     // MARK: - Helpers
 
     private var totalEarned: Int {
-        allRecords.filter { $0.coinPaidAt != nil }.count * 100
+        allRecords.filter { $0.coinPaidAt != nil }.count * 1000
     }
 
     private func purchase(country: Country) {
@@ -319,7 +316,7 @@ struct CountryPurchaseSheet: View {
                     }
                 }
                 .padding()
-                .background(Color.primary.opacity(0.05))
+                .background(Color.primary.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 Spacer()
@@ -330,7 +327,7 @@ struct CountryPurchaseSheet: View {
                         .foregroundStyle(Color.secondary)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.primary.opacity(0.05))
+                        .background(Color.primary.opacity(0.06))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 } else {
                     Button {

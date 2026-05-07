@@ -8,7 +8,7 @@ struct AddHabitSheet: View {
     let nextSortOrder: Int
 
     @State private var name = ""
-    @State private var emoji = "✅"
+    @State private var emoji = "⭐️"
     @State private var showEmojiPicker = false
 
     private var canSave: Bool {

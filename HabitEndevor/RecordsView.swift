@@ -17,6 +17,7 @@ struct RecordsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 overallStatsCard
+                habitPieSection
                 habitStreakList
                 weekdayChart
                 if !failureRecords.isEmpty {
@@ -33,34 +34,91 @@ struct RecordsView: View {
 
     private var overallStatsCard: some View {
         HStack(spacing: 0) {
-            statItem(icon: "", value: "\(totalCheckins)",           label: "총 체크인")
-            Divider().frame(height: 40)
-            statItem(icon: "", value: "\(bestCurrentStreak)일",    label: "최고 스트릭")
-            Divider().frame(height: 40)
-            statItem(icon: "", value: "\(Int(overallRate * 100))%", label: "전체 달성률")
+            statItem(value: "\(totalCheckins)",            label: "총 체크인")
+            Divider().frame(height: 44)
+            statItem(value: "\(bestCurrentStreak)일",     label: "최고 스트릭")
+            Divider().frame(height: 44)
+            statItem(value: "\(Int(overallRate * 100))%", label: "전체 달성률")
         }
-        .padding(.vertical, 16)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 20)
+        .cardBackground()
     }
 
-    private func statItem(icon _: String, value: String, label: String) -> some View {
-        VStack(spacing: 4) {
+    private func statItem(value: String, label: String) -> some View {
+        VStack(spacing: 6) {
             Text(value)
-                .font(.title2)
+                .font(.title)
                 .fontWeight(.bold)
             Text(label)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(Color.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - 습관 비율 파이차트
+
+    private var habitPieSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("습관 비율")
+
+            if pieChartData.isEmpty {
+                Text("습관을 추가하고 체크인하면 차트가 나타납니다.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+            } else {
+                HStack(alignment: .center, spacing: 20) {
+                    Chart(pieChartData) { item in
+                        SectorMark(
+                            angle: .value("체크인", item.count),
+                            innerRadius: .ratio(0.48),
+                            angularInset: 2.5
+                        )
+                        .cornerRadius(4)
+                        .foregroundStyle(
+                            item.index % 2 == 0
+                                ? Color.primary.opacity(0.85)
+                                : Color.primary.opacity(0.4)
+                        )
+                    }
+                    .frame(width: 160, height: 160)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(pieChartData) { item in
+                            HStack(spacing: 8) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(item.index % 2 == 0
+                                        ? Color.primary.opacity(0.85)
+                                        : Color.primary.opacity(0.4))
+                                    .frame(width: 10, height: 10)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(item.habitName)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .lineLimit(1)
+                                    Text("\(item.count)일 · \(Int(item.rate * 100))%")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+        }
+        .cardBackground()
     }
 
     // MARK: - 습관별 스트릭 리스트
 
     private var habitStreakList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionHeader("습관별 스트릭")
+            sectionHeader("습관별 스트릭 & 성공률")
 
             ForEach(activeHabits) { habit in
                 HabitStreakRow(habit: habit)
@@ -69,8 +127,7 @@ struct RecordsView: View {
                 }
             }
         }
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardBackground()
     }
 
     // MARK: - 요일별 달성률 차트
@@ -85,7 +142,7 @@ struct RecordsView: View {
                     y: .value("달성률", item.rate)
                 )
                 .foregroundStyle(Color.primary.opacity(0.8))
-                .cornerRadius(4)
+                .cornerRadius(5)
             }
             .chartYScale(domain: 0...1)
             .chartYAxis {
@@ -93,18 +150,17 @@ struct RecordsView: View {
                     AxisGridLine()
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
-                            Text("\(Int(v * 100))%").font(.caption2)
+                            Text("\(Int(v * 100))%").font(.caption)
                         }
                     }
                 }
             }
-            .frame(height: 160)
+            .frame(height: 180)
             .padding(.bottom, 8)
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardBackground()
     }
 
     // MARK: - 실패 사유 로그
@@ -120,8 +176,7 @@ struct RecordsView: View {
                 }
             }
         }
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardBackground()
     }
 
     // MARK: - Computed Stats
@@ -141,14 +196,29 @@ struct RecordsView: View {
         return Double(checked) / Double(total)
     }
 
-    // 요일별 데이터 (월~일)
+    private var pieChartData: [PieItem] {
+        let totalChecked = allRecords.filter(\.isChecked).count
+        guard totalChecked > 0 else { return [] }
+        return activeHabits.enumerated().compactMap { idx, habit in
+            let count = StreakService.totalCheckedDays(for: habit)
+            guard count > 0 else { return nil }
+            let totalPossible = habit.records.count
+            let rate = totalPossible > 0 ? Double(count) / Double(totalPossible) : 0
+            return PieItem(
+                id: habit.persistentModelID.hashValue,
+                index: idx,
+                habitName: habit.name,
+                count: count,
+                rate: rate
+            )
+        }
+    }
+
     private var weekdayData: [WeekdayItem] {
         let labels = ["월", "화", "수", "목", "금", "토", "일"]
-        let weekdayComponents = [2, 3, 4, 5, 6, 7, 1] // Calendar.weekday (1=Sun)
-
+        let weekdayComponents = [2, 3, 4, 5, 6, 7, 1]
         return zip(labels, weekdayComponents).map { label, component in
-            let rate = weekdayRate(for: component)
-            return WeekdayItem(label: label, rate: rate)
+            WeekdayItem(label: label, rate: weekdayRate(for: component))
         }
     }
 
@@ -169,10 +239,10 @@ struct RecordsView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.subheadline)
+            .font(.body)
             .fontWeight(.semibold)
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
     }
 }
 
@@ -181,38 +251,54 @@ struct RecordsView: View {
 struct HabitStreakRow: View {
     let habit: Habit
 
+    private var successRate: Double {
+        let total = habit.records.count
+        guard total > 0 else { return 0 }
+        return Double(StreakService.totalCheckedDays(for: habit)) / Double(total)
+    }
+
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
             Text(habit.emoji)
+                .font(.body)
             Text(habit.name)
-                .font(.subheadline)
+                .font(.body)
                 .lineLimit(1)
 
             Spacer()
 
             HStack(spacing: 20) {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(StreakService.currentStreak(for: habit))일")
-                        .font(.subheadline)
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("\(Int(successRate * 100))%")
+                        .font(.body)
                         .fontWeight(.semibold)
-                    Text("현재")
-                        .font(.caption2)
+                    Text("성공률")
+                        .font(.caption)
                         .foregroundStyle(Color.secondary)
                 }
 
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("\(StreakService.currentStreak(for: habit))일")
+                        .font(.body)
+                        .fontWeight(.semibold)
+                    Text("현재")
+                        .font(.caption)
+                        .foregroundStyle(Color.secondary)
+                }
+
+                VStack(alignment: .trailing, spacing: 3) {
                     Text("\(StreakService.longestStreak(for: habit))일")
-                        .font(.subheadline)
+                        .font(.body)
                         .fontWeight(.medium)
                         .foregroundStyle(Color.secondary)
                     Text("최장")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(Color.secondary)
                 }
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
     }
 }
 
@@ -231,25 +317,43 @@ struct FailureLogRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
                 Text(habit.emoji)
-                    .font(.caption)
+                    .font(.footnote)
                 Text(habit.name)
-                    .font(.caption)
+                    .font(.footnote)
                     .fontWeight(.medium)
                 Spacer()
                 Text(dateLabel)
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(Color.secondary)
             }
             Text(note)
-                .font(.subheadline)
+                .font(.body)
                 .foregroundStyle(Color.primary.opacity(0.8))
                 .lineLimit(2)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Card Background Modifier
+
+extension View {
+    func cardBackground() -> some View {
+        #if os(iOS)
+        self
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+        #else
+        self
+            .background(Color(.windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.09), radius: 8, x: 0, y: 2)
+        #endif
     }
 }
 
@@ -258,6 +362,14 @@ struct FailureLogRow: View {
 struct WeekdayItem: Identifiable {
     let id = UUID()
     let label: String
+    let rate: Double
+}
+
+struct PieItem: Identifiable {
+    let id: Int
+    let index: Int
+    let habitName: String
+    let count: Int
     let rate: Double
 }
 

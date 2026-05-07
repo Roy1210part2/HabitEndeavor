@@ -10,7 +10,7 @@ final class Habit {
     var isActive: Bool
     @Relationship(deleteRule: .cascade) var records: [HabitRecord]
 
-    init(name: String, emoji: String = "✅", sortOrder: Int = 0) {
+    init(name: String, emoji: String = "⭐️", sortOrder: Int = 0) {
         self.name = name
         self.emoji = emoji
         self.sortOrder = sortOrder
