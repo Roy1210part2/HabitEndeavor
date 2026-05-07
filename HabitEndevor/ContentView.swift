@@ -33,6 +33,9 @@ struct IOSContentView: View {
             NavigationStack { RecordsView() }
                 .tabItem { Label("기록", systemImage: "chart.bar") }
 
+            NavigationStack { QuestView() }
+                .tabItem { Label("퀘스트", systemImage: "trophy.fill") }
+
             NavigationStack { WorldView() }
                 .tabItem { Label("세계", systemImage: "globe") }
 
@@ -90,6 +93,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         }
     }
 }
+
 
 #Preview {
     ContentView()

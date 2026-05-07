@@ -1,14 +1,19 @@
 import SwiftUI
 import SwiftData
+import Charts
 
 struct CheckboxView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Habit.sortOrder) private var habits: [Habit]
     @Query private var allRecords: [HabitRecord]
     @Query private var settingsArray: [AppSettings]
+    @Query private var completedQuests: [CompletedQuest]
+    @Query private var purchases: [PurchasedCountry]
 
     @State private var showAddHabit = false
     @State private var selectedRecord: HabitRecord?
+    // Maps habitID → date of the cell that just got checked (for particle burst)
+    @State private var burstMap: [PersistentIdentifier: Date] = [:]
 
     private var settings: AppSettings {
         settingsArray.first ?? AppSettings()
@@ -35,6 +40,7 @@ struct CheckboxView: View {
                         habit: habit,
                         weekDates: weekDates,
                         records: records(for: habit),
+                        burstDate: burstMap[habit.persistentModelID],
                         onTap: { date in handleTap(habit: habit, date: date) },
                         onLongPress: { date in handleLongPress(habit: habit, date: date) }
                     )
@@ -82,6 +88,15 @@ struct CheckboxView: View {
         }
         .sheet(item: $selectedRecord) { record in
             FailureNoteSheet(record: record)
+        }
+        .onChange(of: allRecords) { _, _ in
+            QuestService.checkAndComplete(
+                habits: habits.filter(\.isActive),
+                allRecords: allRecords,
+                completedQuests: completedQuests,
+                purchases: purchases,
+                context: modelContext
+            )
         }
     }
 
@@ -160,6 +175,11 @@ struct CheckboxView: View {
             ForEach(habits.filter(\.isActive)) { habit in
                 HabitStatsCard(habit: habit, records: records(for: habit))
             }
+
+            OverallAchievementChart(
+                habits: habits.filter(\.isActive),
+                allRecords: allRecords
+            )
         }
         .padding(.bottom, 32)
     }
@@ -180,26 +200,40 @@ struct CheckboxView: View {
     // MARK: - Tap Logic: empty → checked → X → empty
 
     private func handleTap(habit: Habit, date: Date) {
+        var justChecked = false
         if let existing = record(for: habit, on: date) {
             if existing.isChecked {
-                // 체크 → X
                 existing.isChecked = false
-                if existing.date == Date.todayStart {
-                    existing.coinPaidAt = nil
-                }
+                if existing.date == Date.todayStart { existing.coinPaidAt = nil }
             } else {
-                // X → 빈 상태 (삭제)
                 modelContext.delete(existing)
             }
         } else {
-            // 빈 → 체크
             let newRecord = HabitRecord(date: date, habit: habit)
             modelContext.insert(newRecord)
             newRecord.isChecked = true
-            if date == Date.todayStart {
-                newRecord.coinPaidAt = Date()
+            if date == Date.todayStart { newRecord.coinPaidAt = Date() }
+            justChecked = true
+        }
+
+        if justChecked {
+            triggerHaptic()
+            burstMap[habit.persistentModelID] = date
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                burstMap.removeValue(forKey: habit.persistentModelID)
             }
         }
+    }
+
+    private func triggerHaptic() {
+        #if os(iOS)
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            let success = UINotificationFeedbackGenerator()
+            success.notificationOccurred(.success)
+        }
+        #endif
     }
 
     private func handleLongPress(habit: Habit, date: Date) {
@@ -219,6 +253,7 @@ struct HabitRowView: View {
     let habit: Habit
     let weekDates: [Date]
     let records: [HabitRecord]
+    let burstDate: Date?
     let onTap: (Date) -> Void
     let onLongPress: (Date) -> Void
 
@@ -254,12 +289,17 @@ struct HabitRowView: View {
 
             ForEach(weekDates, id: \.self) { date in
                 let rec = records.first { $0.date == date }
-                CheckboxCell(
-                    hasRecord: rec != nil,
-                    isChecked: rec?.isChecked ?? false,
-                    isFuture: date.isFuture,
-                    isToday: date.isToday
-                )
+                ZStack {
+                    CheckboxCell(
+                        hasRecord: rec != nil,
+                        isChecked: rec?.isChecked ?? false,
+                        isFuture: date.isFuture,
+                        isToday: date.isToday
+                    )
+                    if burstDate == date {
+                        CheckmarkBurst()
+                    }
+                }
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -536,6 +576,153 @@ struct HeatmapCell: View {
         case .failed:  return Color.red.opacity(0.3)
         case .empty:   return Color.primary.opacity(0.08)
         }
+    }
+}
+
+// MARK: - Checkmark Burst (Particle Animation)
+
+struct CheckmarkBurst: View {
+    @State private var exploded = false
+
+    private let particleColors: [Color] = [
+        .orange, .yellow, .pink, .blue, .green, .red, .purple, .teal, .orange, .mint, .cyan, .yellow
+    ]
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<12, id: \.self) { i in
+                let angle = Double(i) * (360.0 / 12.0)
+                Circle()
+                    .fill(particleColors[i % particleColors.count])
+                    .frame(width: 5, height: 5)
+                    .offset(
+                        x: exploded ? CGFloat(cos(angle * .pi / 180)) * 30 : 0,
+                        y: exploded ? CGFloat(sin(angle * .pi / 180)) * 30 : 0
+                    )
+                    .opacity(exploded ? 0 : 1)
+                    .scaleEffect(exploded ? 0.3 : 1.2)
+            }
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.55)) { exploded = true }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Overall Achievement Chart
+
+struct OverallAchievementChart: View {
+    let habits: [Habit]
+    let allRecords: [HabitRecord]
+
+    struct HabitRate: Identifiable {
+        let id: Int
+        let emoji: String
+        let name: String
+        let rate: Double
+    }
+
+    private func records(for habit: Habit) -> [HabitRecord] {
+        allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
+    }
+
+    private func monthRate(for habit: Habit) -> Double {
+        let cal = Calendar.current
+        let now = Date()
+        let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now))!
+        let daysPassed = cal.dateComponents([.day], from: startOfMonth, to: now).day! + 1
+        guard daysPassed > 0 else { return 0 }
+        let checked = records(for: habit).filter { $0.isChecked && $0.date >= startOfMonth }.count
+        return Double(checked) / Double(daysPassed)
+    }
+
+    private var chartData: [HabitRate] {
+        habits.enumerated().map { idx, habit in
+            HabitRate(
+                id: idx,
+                emoji: habit.emoji,
+                name: habit.name,
+                rate: monthRate(for: habit)
+            )
+        }
+    }
+
+    private var overallRate: Double {
+        guard !chartData.isEmpty else { return 0 }
+        return chartData.map(\.rate).reduce(0, +) / Double(chartData.count)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .bottom, spacing: 6) {
+                Text("이번달 전체 달성률")
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(Int(overallRate * 100))%")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.primary)
+            }
+
+            // Overall progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(height: 10)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.8))
+                        .frame(width: geo.size.width * CGFloat(overallRate), height: 10)
+                        .animation(.easeInOut(duration: 0.6), value: overallRate)
+                }
+            }
+            .frame(height: 10)
+
+            // Per-habit bar chart
+            if !chartData.isEmpty {
+                Chart(chartData) { item in
+                    BarMark(
+                        x: .value("달성률", item.rate),
+                        y: .value("습관", "\(item.emoji) \(item.name)")
+                    )
+                    .foregroundStyle(
+                        item.rate >= 0.8 ? Color.primary.opacity(0.85) :
+                        item.rate >= 0.5 ? Color.primary.opacity(0.55) :
+                                           Color.primary.opacity(0.25)
+                    )
+                    .cornerRadius(5)
+                    .annotation(position: .trailing) {
+                        Text("\(Int(item.rate * 100))%")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(Color.secondary)
+                    }
+                }
+                .chartXScale(domain: 0...1)
+                .chartXAxis {
+                    AxisMarks(values: [0, 0.25, 0.5, 0.75, 1.0]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) {
+                                Text("\(Int(v * 100))%").font(.system(size: 9))
+                            }
+                        }
+                    }
+                }
+                .frame(height: CGFloat(chartData.count) * 44)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.cardBackground)
+                .shadow(color: .black.opacity(0.07), radius: 6, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+        )
     }
 }
 

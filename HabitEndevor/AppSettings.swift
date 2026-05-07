@@ -7,16 +7,22 @@ final class AppSettings {
     var notificationHour: Int
     var notificationMinute: Int
     var prefersDarkMode: Bool
+    var streakRescueEnabled: Bool
+    var weeklyReviewEnabled: Bool
 
     init(
         weekStartsOnMonday: Bool = true,
         notificationHour: Int = 22,
         notificationMinute: Int = 0,
-        prefersDarkMode: Bool = false
+        prefersDarkMode: Bool = false,
+        streakRescueEnabled: Bool = false,
+        weeklyReviewEnabled: Bool = false
     ) {
         self.weekStartsOnMonday = weekStartsOnMonday
         self.notificationHour = notificationHour
         self.notificationMinute = notificationMinute
         self.prefersDarkMode = prefersDarkMode
+        self.streakRescueEnabled = streakRescueEnabled
+        self.weeklyReviewEnabled = weeklyReviewEnabled
     }
 }

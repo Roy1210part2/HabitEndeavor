@@ -7,13 +7,16 @@ struct WorldView: View {
     @Query private var allRecords: [HabitRecord]
     @Query private var purchases: [PurchasedCountry]
     @Query private var habits: [Habit]
+    @Query private var completedQuests: [CompletedQuest]
 
     @State private var selectedContinent: Country.Continent? = nil
     @State private var purchaseTarget: Country? = nil
     @State private var searchText = ""
 
+    private var questCoins: Int { completedQuests.reduce(0) { $0 + $1.coinsAwarded } }
+
     private var balance: Int {
-        CoinService.balance(records: allRecords, purchases: purchases)
+        CoinService.balance(records: allRecords, purchases: purchases, questCoins: questCoins)
     }
 
     private var ownedCodes: Set<String> {

@@ -99,6 +99,28 @@ struct SettingsForm: View {
                                 .labelsHidden()
                         }
                         .padding(.vertical, 4)
+
+                        HStack {
+                            Text("스트릭 위기 알림 (22:00)").font(.body)
+                            Spacer()
+                            Toggle("", isOn: $settings.streakRescueEnabled)
+                                .labelsHidden()
+                                .onChange(of: settings.streakRescueEnabled) { _, on in
+                                    on ? scheduleStreakRescue() : cancelStreakRescue()
+                                }
+                        }
+                        .padding(.vertical, 4)
+
+                        HStack {
+                            Text("주간 성과 알림 (월요일 09:00)").font(.body)
+                            Spacer()
+                            Toggle("", isOn: $settings.weeklyReviewEnabled)
+                                .labelsHidden()
+                                .onChange(of: settings.weeklyReviewEnabled) { _, on in
+                                    on ? scheduleWeeklyReview() : cancelWeeklyReview()
+                                }
+                        }
+                        .padding(.vertical, 4)
                     }
                 }
 
@@ -174,6 +196,14 @@ struct SettingsForm: View {
                     DatePicker("알림 시간",
                                selection: notificationTime,
                                displayedComponents: .hourAndMinute)
+                    Toggle("스트릭 위기 알림 (22:00)", isOn: $settings.streakRescueEnabled)
+                        .onChange(of: settings.streakRescueEnabled) { _, on in
+                            on ? scheduleStreakRescue() : cancelStreakRescue()
+                        }
+                    Toggle("주간 성과 알림 (월요일 09:00)", isOn: $settings.weeklyReviewEnabled)
+                        .onChange(of: settings.weeklyReviewEnabled) { _, on in
+                            on ? scheduleWeeklyReview() : cancelWeeklyReview()
+                        }
                 }
             }
 
@@ -229,6 +259,45 @@ struct SettingsForm: View {
     private func cancelNotification() {
         UNUserNotificationCenter.current()
             .removePendingNotificationRequests(withIdentifiers: ["daily-report"])
+    }
+
+    private func scheduleStreakRescue() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["streak-rescue"])
+        let content       = UNMutableNotificationContent()
+        content.title     = "⚡️ 스트릭이 위험해요!"
+        content.body      = "오늘 습관을 아직 완료하지 않으셨어요. 자정까지 2시간 남았어요!"
+        content.sound     = .default
+        var c             = DateComponents()
+        c.hour            = 22
+        c.minute          = 0
+        let trigger       = UNCalendarNotificationTrigger(dateMatching: c, repeats: true)
+        center.add(UNNotificationRequest(identifier: "streak-rescue", content: content, trigger: trigger))
+    }
+
+    private func cancelStreakRescue() {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: ["streak-rescue"])
+    }
+
+    private func scheduleWeeklyReview() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["weekly-review"])
+        let content       = UNMutableNotificationContent()
+        content.title     = "🏆 지난 주 성과 확인하기"
+        content.body      = "한 주 동안 얼마나 성장했는지 확인해보세요!"
+        content.sound     = .default
+        var c             = DateComponents()
+        c.weekday         = 2   // 월요일
+        c.hour            = 9
+        c.minute          = 0
+        let trigger       = UNCalendarNotificationTrigger(dateMatching: c, repeats: true)
+        center.add(UNNotificationRequest(identifier: "weekly-review", content: content, trigger: trigger))
+    }
+
+    private func cancelWeeklyReview() {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: ["weekly-review"])
     }
 
     private func openSystemSettings() {

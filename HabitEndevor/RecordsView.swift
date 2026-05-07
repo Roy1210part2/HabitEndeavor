@@ -16,6 +16,7 @@ struct RecordsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                WeeklyReviewCard(habits: activeHabits, allRecords: allRecords)
                 overallStatsCard
                 habitPieSection
                 habitStreakList
@@ -354,6 +355,151 @@ extension View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.09), radius: 8, x: 0, y: 2)
         #endif
+    }
+}
+
+// MARK: - Weekly Review Card
+
+struct WeeklyReviewCard: View {
+    let habits: [Habit]
+    let allRecords: [HabitRecord]
+
+    private let cal = Calendar.current
+
+    // This week: Mon–today
+    private var thisWeekDates: [Date] {
+        let today = Date.todayStart
+        let weekday = cal.component(.weekday, from: today)
+        let daysFromMon = (weekday + 5) % 7
+        return (0...daysFromMon).compactMap {
+            cal.date(byAdding: .day, value: -($0), to: today)
+        }.reversed()
+    }
+
+    // Last week: 7 days before this week's Monday
+    private var lastWeekDates: [Date] {
+        guard let thisMonday = thisWeekDates.first else { return [] }
+        return (1...7).compactMap {
+            cal.date(byAdding: .day, value: -$0, to: thisMonday)
+        }.reversed()
+    }
+
+    private func rate(for dates: [Date]) -> Double {
+        guard !habits.isEmpty, !dates.isEmpty else { return 0 }
+        let total = habits.count * dates.count
+        let checked = habits.reduce(0) { sum, habit in
+            sum + dates.filter { date in
+                allRecords.first {
+                    $0.habit?.persistentModelID == habit.persistentModelID && $0.date == date
+                }?.isChecked == true
+            }.count
+        }
+        return Double(checked) / Double(total)
+    }
+
+    private var thisRate: Double { rate(for: thisWeekDates) }
+    private var lastRate: Double { rate(for: lastWeekDates) }
+    private var delta: Double { thisRate - lastRate }
+
+    private var bestHabit: Habit? {
+        habits.max { a, b in
+            let ra = rate(for: thisWeekDates.filter { _ in true }, habit: a)
+            let rb = rate(for: thisWeekDates.filter { _ in true }, habit: b)
+            return ra < rb
+        }
+    }
+
+    private func rate(for dates: [Date], habit: Habit) -> Double {
+        guard !dates.isEmpty else { return 0 }
+        let checked = dates.filter { date in
+            allRecords.first {
+                $0.habit?.persistentModelID == habit.persistentModelID && $0.date == date
+            }?.isChecked == true
+        }.count
+        return Double(checked) / Double(dates.count)
+    }
+
+    private var bestStreak: Int {
+        habits.map { StreakService.currentStreak(for: $0) }.max() ?? 0
+    }
+
+    private var deltaLabel: String {
+        let pct = Int(abs(delta) * 100)
+        if delta > 0.001  { return "+\(pct)% ↑" }
+        if delta < -0.001 { return "-\(pct)% ↓" }
+        return "유지 →"
+    }
+
+    private var deltaColor: Color {
+        if delta > 0.001  { return .green }
+        if delta < -0.001 { return .red }
+        return .secondary
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("🏆 이번 주 리뷰")
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.semibold)
+                Spacer()
+                Text(weekRangeLabel)
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(Color.secondary)
+            }
+
+            HStack(spacing: 0) {
+                reviewItem(title: "달성률", value: "\(Int(thisRate * 100))%", color: .primary)
+                Divider().frame(height: 36)
+                reviewItem(title: "전주 대비", value: deltaLabel, color: deltaColor)
+                Divider().frame(height: 36)
+                reviewItem(title: "최장 스트릭", value: "\(bestStreak)일", color: .orange)
+            }
+
+            if let mvp = bestHabit {
+                HStack(spacing: 6) {
+                    Text("이번 주 MVP")
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(Color.secondary)
+                    Text(mvp.emoji)
+                    Text(mvp.name)
+                        .font(.system(.footnote, design: .rounded))
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(Int(rate(for: thisWeekDates, habit: mvp) * 100))%")
+                        .font(.system(.footnote, design: .rounded))
+                        .foregroundStyle(Color.secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .cardBackground()
+    }
+
+    private func reviewItem(title: String, value: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundStyle(color)
+            Text(title)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(Color.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var weekRangeLabel: String {
+        guard let first = thisWeekDates.first, let last = thisWeekDates.last else { return "" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M/d"
+        return "\(f.string(from: first)) ~ \(f.string(from: last))"
     }
 }
 
