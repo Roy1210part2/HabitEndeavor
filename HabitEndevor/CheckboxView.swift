@@ -576,40 +576,35 @@ struct CombinedHeatmapGrid: View {
     let habits: [Habit]
     let allRecords: [HabitRecord]
 
+    private let cols = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
+
     var body: some View {
-        GeometryReader { geo in
-            let size    = geo.size.width           // 정사각형 기준
-            let pad     = size * 0.06
-            let spacing = size * 0.04
-            let cols    = Array(repeating: GridItem(.flexible(), spacing: spacing), count: 2)
+        VStack(alignment: .leading, spacing: 8) {
+            Text("28일 히트맵")
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.semibold)
 
-            VStack(alignment: .leading, spacing: spacing * 0.6) {
-                Text("28일 히트맵")
-                    .font(.system(size: size * 0.045, weight: .semibold, design: .rounded))
-                    .padding(.top, pad * 0.5)
-
-                if habits.isEmpty {
-                    Text("습관을 추가해보세요")
-                        .font(.subheadline).foregroundStyle(Color.secondary)
-                } else {
-                    LazyVGrid(columns: cols, spacing: spacing) {
-                        ForEach(habits) { habit in
-                            HabitMiniCard(
-                                habit: habit,
-                                records: allRecords.filter {
-                                    $0.habit?.persistentModelID == habit.persistentModelID
-                                }
-                            )
-                            .aspectRatio(1, contentMode: .fit)
-                        }
+            if habits.isEmpty {
+                Text("습관을 추가해보세요")
+                    .font(.subheadline).foregroundStyle(Color.secondary)
+            } else {
+                LazyVGrid(columns: cols, spacing: 8) {
+                    ForEach(habits) { habit in
+                        HabitMiniCard(
+                            habit: habit,
+                            records: allRecords.filter {
+                                $0.habit?.persistentModelID == habit.persistentModelID
+                            }
+                        )
+                        .aspectRatio(1, contentMode: .fit)
                     }
                 }
             }
-            .padding(.horizontal, pad)
-            .padding(.bottom, pad)
-            .frame(width: size, height: size)
         }
-        .aspectRatio(1, contentMode: .fit)   // 외부 정사각형 강제
+        .padding(14)
+        // 전체 카드를 정사각형으로: ScrollView 안에서도 올바르게 작동
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.cardBackground)

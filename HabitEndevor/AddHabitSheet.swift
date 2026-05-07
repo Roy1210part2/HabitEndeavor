@@ -3,51 +3,77 @@ import SwiftData
 
 struct AddHabitSheet: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss)      private var dismiss
 
     let nextSortOrder: Int
 
-    @State private var name = ""
-    @State private var emoji = "⭐️"
-    @State private var selectedColorHex = habitColorPalette[5]  // 하늘색 기본
-    @State private var showEmojiPicker = false
+    @State private var name             = ""
+    @State private var emoji            = "⭐️"
+    @State private var selectedColorHex = habitColorPalette[5]
+    @State private var showEmojiPicker  = false
 
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty
-    }
+    private var selectedColor: Color { Color(hex: selectedColorHex) ?? .blue }
+    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    HStack(spacing: 12) {
-                        // 이모지 + 색상 프리뷰 버튼
-                        Button { showEmojiPicker = true } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color(hex: selectedColorHex) ?? .blue)
-                                    .frame(width: 48, height: 48)
-                                Text(emoji).font(.title2)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+
+                    // ── 색상 선택 (맨 위, 항상 보임) ──
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("색상 선택", systemImage: "paintpalette")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.secondary)
+
+                        colorGrid
+                    }
+
+                    // ── 이모지 + 이름 ──
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("습관 정보", systemImage: "pencil")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.secondary)
+
+                        HStack(spacing: 12) {
+                            Button { showEmojiPicker.toggle() } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(selectedColor)
+                                        .frame(width: 52, height: 52)
+                                    Text(emoji).font(.title2)
+                                }
                             }
+                            .buttonStyle(.plain)
+
+                            TextField("습관 이름 (예: 운동, 독서)", text: $name)
+                                .font(.system(.body, design: .rounded))
+                                .submitLabel(.done)
+                                .onSubmit { if canSave { save() } }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.primary.opacity(0.06))
+                                )
                         }
-                        .buttonStyle(.plain)
-
-                        TextField("습관 이름 (예: 운동, 독서)", text: $name)
-                            .submitLabel(.done)
-                            .onSubmit { if canSave { save() } }
                     }
-                    .padding(.vertical, 4)
-                }
 
-                if showEmojiPicker {
-                    Section("이모지 선택") {
-                        EmojiPickerView(selected: $emoji, onSelect: { showEmojiPicker = false })
+                    // ── 이모지 선택 ──
+                    if showEmojiPicker {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("이모지 선택", systemImage: "face.smiling")
+                                .font(.system(.subheadline, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.secondary)
+
+                            emojiGrid
+                        }
                     }
                 }
-
-                Section("색상 선택") {
-                    ColorPaletteView(selectedHex: $selectedColorHex)
-                }
+                .padding(20)
             }
             .navigationTitle("습관 추가")
             #if os(iOS)
@@ -66,7 +92,70 @@ struct AddHabitSheet: View {
         }
         #if os(iOS)
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
         #endif
+    }
+
+    // MARK: - 색상 그리드
+
+    private var colorGrid: some View {
+        let cols = Array(repeating: GridItem(.flexible(), spacing: 10), count: 6)
+        return LazyVGrid(columns: cols, spacing: 10) {
+            ForEach(habitColorPalette, id: \.self) { hex in
+                let c = Color(hex: hex) ?? .blue
+                let isSelected = selectedColorHex == hex
+                Circle()
+                    .fill(c)
+                    .frame(height: 40)
+                    .overlay(
+                        Circle()
+                            .stroke(.white, lineWidth: isSelected ? 3 : 0)
+                            .padding(3)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(c, lineWidth: isSelected ? 2 : 0)
+                    )
+                    .scaleEffect(isSelected ? 1.15 : 1.0)
+                    .animation(.spring(response: 0.25), value: isSelected)
+                    .onTapGesture {
+                        selectedColorHex = hex
+                        #if os(iOS)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        #endif
+                    }
+            }
+        }
+    }
+
+    // MARK: - 이모지 그리드
+
+    private let emojis = [
+        "⭐️", "🔥", "💪", "🏃", "🧘", "📚", "✍️",
+        "🎯", "🎨", "🎵", "🍎", "💧", "😴", "🧹", "💻",
+        "📝", "🏋️", "🚴", "🌱", "🧠", "❤️", "💊", "🛁",
+        "☀️", "🌙", "🍵", "🥗", "🙏", "📖", "🎤", "🌍",
+    ]
+
+    private var emojiGrid: some View {
+        let cols = Array(repeating: GridItem(.flexible()), count: 8)
+        return LazyVGrid(columns: cols, spacing: 8) {
+            ForEach(emojis, id: \.self) { e in
+                Button {
+                    emoji = e
+                    showEmojiPicker = false
+                } label: {
+                    Text(e)
+                        .font(.title3)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(emoji == e ? selectedColor.opacity(0.2) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private func save() {
@@ -81,7 +170,7 @@ struct AddHabitSheet: View {
     }
 }
 
-// MARK: - Color Palette Picker
+// ColorPaletteView — 다른 곳에서도 재사용 가능하도록 유지
 
 struct ColorPaletteView: View {
     @Binding var selectedHex: String
@@ -91,64 +180,21 @@ struct ColorPaletteView: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 10) {
             ForEach(habitColorPalette, id: \.self) { hex in
-                let color = Color(hex: hex) ?? .blue
-                ZStack {
-                    Circle().fill(color).frame(width: 36, height: 36)
-                    if selectedHex == hex {
-                        Circle()
-                            .strokeBorder(Color.primary, lineWidth: 2)
-                            .frame(width: 40, height: 40)
-                        Circle()
-                            .fill(.white.opacity(0.35))
-                            .frame(width: 36, height: 36)
+                let c = Color(hex: hex) ?? .blue
+                let isSelected = selectedHex == hex
+                Circle()
+                    .fill(c)
+                    .frame(height: 36)
+                    .overlay(Circle().stroke(.white, lineWidth: isSelected ? 3 : 0).padding(3))
+                    .overlay(Circle().stroke(c, lineWidth: isSelected ? 2 : 0))
+                    .scaleEffect(isSelected ? 1.15 : 1.0)
+                    .animation(.spring(response: 0.25), value: isSelected)
+                    .onTapGesture {
+                        selectedHex = hex
+                        #if os(iOS)
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        #endif
                     }
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(Circle())
-                .onTapGesture {
-                    selectedHex = hex
-                    #if os(iOS)
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    #endif
-                }
-                .animation(.spring(response: 0.2), value: selectedHex)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-// MARK: - Emoji Picker
-
-struct EmojiPickerView: View {
-    @Binding var selected: String
-    let onSelect: () -> Void
-
-    private let emojis = [
-        "⭐️", "🔥", "💪", "🏃", "🧘", "📚", "✍️",
-        "🎯", "🎨", "🎵", "🍎", "💧", "😴", "🧹", "💻",
-        "📝", "🏋️", "🚴", "🌱", "🧠", "❤️", "💊", "🛁",
-        "☀️", "🌙", "🍵", "🥗", "🚫", "🙏", "📖", "🎤",
-    ]
-
-    let columns = Array(repeating: GridItem(.flexible()), count: 8)
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(emojis, id: \.self) { e in
-                Button {
-                    selected = e
-                    onSelect()
-                } label: {
-                    Text(e)
-                        .font(.title3)
-                        .frame(width: 36, height: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(selected == e ? Color.primary.opacity(0.15) : Color.clear)
-                        )
-                }
-                .buttonStyle(.plain)
             }
         }
     }
