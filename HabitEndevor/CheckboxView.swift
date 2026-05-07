@@ -176,7 +176,7 @@ struct CheckboxView: View {
                 HabitStatsCard(habit: habit, records: records(for: habit))
             }
 
-            OverallAchievementChart(
+            HabitTrendChart(
                 habits: habits.filter(\.isActive),
                 allRecords: allRecords
             )
@@ -378,6 +378,36 @@ struct DayCellData {
     var isToday: Bool { Calendar.current.isDateInToday(date) }
 }
 
+// MARK: Bento Heatmap (compact 7×4, no labels)
+
+struct BentoHeatmap: View {
+    let cells: [DayCellData]
+    let accentColor: Color
+
+    private let cols = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
+
+    var body: some View {
+        LazyVGrid(columns: cols, spacing: 2) {
+            ForEach(0..<cells.count, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(cellColor(cells[i]))
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay(cells[i].isToday
+                        ? RoundedRectangle(cornerRadius: 2).stroke(accentColor, lineWidth: 1.5)
+                        : nil)
+            }
+        }
+    }
+
+    private func cellColor(_ c: DayCellData) -> Color {
+        switch c.mark {
+        case .checked: return accentColor.opacity(0.85)
+        case .failed:  return Color.red.opacity(0.3)
+        case .empty:   return Color.primary.opacity(0.07)
+        }
+    }
+}
+
 struct HabitStatsCard: View {
     let habit: Habit
     let records: [HabitRecord]
@@ -386,14 +416,11 @@ struct HabitStatsCard: View {
     private var totalCount: Int { checkedRecords.count }
 
     private var currentStreak: Int {
-        var streak = 0
-        var day = Date.todayStart
+        var streak = 0, day = Date.todayStart
         let cal = Calendar.current
-        while true {
-            if records.first(where: { $0.date == day })?.isChecked == true {
-                streak += 1
-                day = cal.date(byAdding: .day, value: -1, to: day)!
-            } else { break }
+        while records.first(where: { $0.date == day })?.isChecked == true {
+            streak += 1
+            day = cal.date(byAdding: .day, value: -1, to: day)!
         }
         return streak
     }
@@ -423,44 +450,59 @@ struct HabitStatsCard: View {
         let cal = Calendar.current
         return (0..<28).reversed().map { offset in
             let date = cal.date(byAdding: .day, value: -offset, to: Date.todayStart)!
-            let rec = records.first { $0.date == date }
-            let mark: DayMark = rec.map { $0.isChecked ? .checked : .failed } ?? .empty
-            return DayCellData(date: date, mark: mark)
+            let rec  = records.first { $0.date == date }
+            return DayCellData(date: date, mark: rec.map { $0.isChecked ? .checked : .failed } ?? .empty)
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                HStack(spacing: 6) {
-                    Text(habit.emoji).font(.title3)
-                    Text(habit.name)
-                        .font(.system(.subheadline, design: .rounded))
-                        .fontWeight(.semibold)
-                }
-                Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            // ── Header ──
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(habit.displayColor)
+                    .frame(width: 4, height: 22)
+                Text(habit.emoji).font(.title3)
+                Text(habit.name)
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
+
+            // ── Bento row: heatmap + ring ──
+            HStack(alignment: .center, spacing: 10) {
+                BentoHeatmap(cells: heatmapCells, accentColor: habit.displayColor)
+                    .frame(maxWidth: .infinity)
+
                 VStack(spacing: 3) {
-                    RingProgressView(value: thisMonthRate)
+                    RingProgressView(value: thisMonthRate, color: habit.displayColor)
                     Text("이번달")
                         .font(.system(size: 9, design: .rounded))
                         .foregroundStyle(Color.secondary)
                 }
+                .frame(width: 58)
             }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
 
-            MiniHeatmapView(cells: heatmapCells)
+            Divider().padding(.horizontal, 10)
 
+            // ── Stats row ──
             HStack(spacing: 0) {
-                statItem(icon: "flame.fill",   color: .orange,
-                         value: "\(currentStreak)일", label: "연속 달성")
-                Divider().frame(height: 32)
-                statItem(icon: "star.fill",    color: .yellow,
-                         value: "\(totalCount)회",   label: "총 달성")
-                Divider().frame(height: 32)
-                statItem(icon: "trophy.fill",  color: Color(red: 0.8, green: 0.6, blue: 0.2),
-                         value: "\(bestStreak)일",   label: "최장 연속")
+                statItem(icon: "flame.fill",  color: .orange,
+                         value: "\(currentStreak)일", label: "연속")
+                Divider().frame(height: 28)
+                statItem(icon: "star.fill",   color: habit.displayColor,
+                         value: "\(totalCount)회",   label: "총달성")
+                Divider().frame(height: 28)
+                statItem(icon: "trophy.fill", color: Color(red: 0.8, green: 0.6, blue: 0.2),
+                         value: "\(bestStreak)일",   label: "최장")
             }
+            .padding(.vertical, 8)
         }
-        .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.cardBackground)
@@ -468,21 +510,15 @@ struct HabitStatsCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+                .stroke(habit.displayColor.opacity(0.25), lineWidth: 1.5)
         )
     }
 
     private func statItem(icon: String, color: Color, value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 15))
-                .foregroundStyle(color)
-            Text(value)
-                .font(.system(.subheadline, design: .rounded))
-                .fontWeight(.bold)
-            Text(label)
-                .font(.system(size: 10, design: .rounded))
-                .foregroundStyle(Color.secondary)
+        VStack(spacing: 3) {
+            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(color)
+            Text(value).font(.system(.footnote, design: .rounded)).fontWeight(.bold)
+            Text(label).font(.system(size: 9, design: .rounded)).foregroundStyle(Color.secondary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -492,17 +528,14 @@ struct HabitStatsCard: View {
 
 struct RingProgressView: View {
     let value: Double
+    var color: Color = Color.primary.opacity(0.85)
 
     var body: some View {
         ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.1), lineWidth: 5)
+            Circle().stroke(Color.primary.opacity(0.1), lineWidth: 5)
             Circle()
                 .trim(from: 0, to: CGFloat(min(value, 1.0)))
-                .stroke(
-                    Color.primary.opacity(0.85),
-                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                )
+                .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.easeInOut(duration: 0.5), value: value)
             VStack(spacing: 0) {
@@ -514,68 +547,6 @@ struct RingProgressView: View {
             }
         }
         .frame(width: 46, height: 46)
-    }
-}
-
-// MARK: - Mini Heatmap View
-
-struct MiniHeatmapView: View {
-    let cells: [DayCellData]
-
-    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 3), count: 7)
-    private let dayLabels = ["월", "화", "수", "목", "금", "토", "일"]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            LazyVGrid(columns: gridColumns, spacing: 2) {
-                ForEach(dayLabels, id: \.self) { label in
-                    Text(label)
-                        .font(.system(size: 8, design: .rounded))
-                        .foregroundStyle(Color.secondary.opacity(0.6))
-                        .frame(maxWidth: .infinity)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            LazyVGrid(columns: gridColumns, spacing: 3) {
-                ForEach(0..<cells.count, id: \.self) { idx in
-                    HeatmapCell(cell: cells[idx])
-                }
-            }
-            HStack {
-                Text("28일 전")
-                    .font(.system(size: 8, design: .rounded))
-                    .foregroundStyle(Color.secondary.opacity(0.5))
-                Spacer()
-                Text("오늘")
-                    .font(.system(size: 8, design: .rounded))
-                    .foregroundStyle(Color.secondary.opacity(0.5))
-            }
-            .padding(.top, 1)
-        }
-    }
-}
-
-struct HeatmapCell: View {
-    let cell: DayCellData
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 3)
-            .fill(fillColor)
-            .aspectRatio(1, contentMode: .fit)
-            .overlay(
-                cell.isToday
-                    ? RoundedRectangle(cornerRadius: 3)
-                        .stroke(Color.primary.opacity(0.7), lineWidth: 1.5)
-                    : nil
-            )
-    }
-
-    private var fillColor: Color {
-        switch cell.mark {
-        case .checked: return Color.primary.opacity(0.82)
-        case .failed:  return Color.red.opacity(0.3)
-        case .empty:   return Color.primary.opacity(0.08)
-        }
     }
 }
 
@@ -610,107 +581,124 @@ struct CheckmarkBurst: View {
     }
 }
 
-// MARK: - Overall Achievement Chart
+// MARK: - Habit Trend Chart (꺾은선)
 
-struct OverallAchievementChart: View {
+struct HabitTrendChart: View {
     let habits: [Habit]
     let allRecords: [HabitRecord]
 
-    struct HabitRate: Identifiable {
-        let id: Int
-        let emoji: String
-        let name: String
+    private let weekLabels = ["4주전", "3주전", "2주전", "이번주"]
+
+    struct TrendPoint: Identifiable {
+        let id = UUID()
+        let habitID: PersistentIdentifier
+        let seriesName: String
+        let color: Color
+        let weekIndex: Int
         let rate: Double
     }
 
-    private func records(for habit: Habit) -> [HabitRecord] {
-        allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
-    }
-
-    private func monthRate(for habit: Habit) -> Double {
+    private func weeklyRate(for habit: Habit, weekOffset: Int) -> Double {
         let cal = Calendar.current
-        let now = Date()
-        let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: now))!
-        let daysPassed = cal.dateComponents([.day], from: startOfMonth, to: now).day! + 1
-        guard daysPassed > 0 else { return 0 }
-        let checked = records(for: habit).filter { $0.isChecked && $0.date >= startOfMonth }.count
-        return Double(checked) / Double(daysPassed)
+        let today = Date.todayStart
+        let recs = allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
+        var checked = 0, total = 7
+        for d in 0..<7 {
+            guard let date = cal.date(byAdding: .day, value: -(weekOffset * 7 + d), to: today) else { continue }
+            if date > today { total -= 1; continue }
+            if recs.first(where: { $0.date == date })?.isChecked == true { checked += 1 }
+        }
+        return total > 0 ? Double(checked) / Double(total) : 0
     }
 
-    private var chartData: [HabitRate] {
-        habits.enumerated().map { idx, habit in
-            HabitRate(
-                id: idx,
-                emoji: habit.emoji,
-                name: habit.name,
-                rate: monthRate(for: habit)
-            )
+    private var trendData: [TrendPoint] {
+        habits.flatMap { habit in
+            (0..<4).map { offset in
+                TrendPoint(
+                    habitID: habit.persistentModelID,
+                    seriesName: "\(habit.emoji) \(habit.name)",
+                    color: habit.displayColor,
+                    weekIndex: 3 - offset,
+                    rate: weeklyRate(for: habit, weekOffset: offset)
+                )
+            }
         }
     }
 
-    private var overallRate: Double {
-        guard !chartData.isEmpty else { return 0 }
-        return chartData.map(\.rate).reduce(0, +) / Double(chartData.count)
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .bottom, spacing: 6) {
-                Text("이번달 전체 달성률")
-                    .font(.system(.subheadline, design: .rounded))
-                    .fontWeight(.semibold)
-                Spacer()
-                Text("\(Int(overallRate * 100))%")
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.primary)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("4주 달성 추이")
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.semibold)
 
-            // Overall progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.primary.opacity(0.08))
-                        .frame(height: 10)
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.primary.opacity(0.8))
-                        .frame(width: geo.size.width * CGFloat(overallRate), height: 10)
-                        .animation(.easeInOut(duration: 0.6), value: overallRate)
-                }
-            }
-            .frame(height: 10)
+            if habits.isEmpty {
+                Text("습관을 추가하면 추이 그래프가 나타납니다.")
+                    .font(.subheadline).foregroundStyle(Color.secondary)
+                    .padding(.bottom, 8)
+            } else {
+                Chart {
+                    ForEach(habits) { habit in
+                        let pts = trendData.filter { $0.habitID == habit.persistentModelID }
+                        ForEach(pts) { p in
+                            LineMark(
+                                x: .value("주", p.weekIndex),
+                                y: .value("달성률", p.rate),
+                                series: .value("습관", p.seriesName)
+                            )
+                            .foregroundStyle(habit.displayColor)
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
 
-            // Per-habit bar chart
-            if !chartData.isEmpty {
-                Chart(chartData) { item in
-                    BarMark(
-                        x: .value("달성률", item.rate),
-                        y: .value("습관", "\(item.emoji) \(item.name)")
-                    )
-                    .foregroundStyle(
-                        item.rate >= 0.8 ? Color.primary.opacity(0.85) :
-                        item.rate >= 0.5 ? Color.primary.opacity(0.55) :
-                                           Color.primary.opacity(0.25)
-                    )
-                    .cornerRadius(5)
-                    .annotation(position: .trailing) {
-                        Text("\(Int(item.rate * 100))%")
-                            .font(.system(size: 10, design: .rounded))
-                            .foregroundStyle(Color.secondary)
+                            PointMark(
+                                x: .value("주", p.weekIndex),
+                                y: .value("달성률", p.rate)
+                            )
+                            .foregroundStyle(habit.displayColor)
+                            .symbolSize(35)
+                        }
                     }
                 }
-                .chartXScale(domain: 0...1)
+                .chartYScale(domain: 0...1)
+                .chartXScale(domain: 0...3)
                 .chartXAxis {
-                    AxisMarks(values: [0, 0.25, 0.5, 0.75, 1.0]) { value in
+                    AxisMarks(values: [0, 1, 2, 3]) { val in
+                        AxisValueLabel {
+                            if let v = val.as(Int.self) {
+                                Text(weekLabels[v]).font(.system(size: 9, design: .rounded))
+                            }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(values: [0, 0.5, 1.0]) { val in
                         AxisGridLine()
                         AxisValueLabel {
-                            if let v = value.as(Double.self) {
+                            if let v = val.as(Double.self) {
                                 Text("\(Int(v * 100))%").font(.system(size: 9))
                             }
                         }
                     }
                 }
-                .frame(height: CGFloat(chartData.count) * 44)
+                .frame(height: 160)
+
+                // Legend
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 6
+                ) {
+                    ForEach(habits) { habit in
+                        HStack(spacing: 6) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(habit.displayColor)
+                                .frame(width: 18, height: 3)
+                            Text("\(habit.emoji) \(habit.name)")
+                                .font(.system(size: 10, design: .rounded))
+                                .foregroundStyle(Color.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(.top, 4)
             }
         }
         .padding(14)

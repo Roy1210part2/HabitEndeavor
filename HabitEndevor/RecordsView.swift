@@ -6,6 +6,8 @@ struct RecordsView: View {
     @Query(sort: \Habit.sortOrder) private var habits: [Habit]
     @Query private var allRecords: [HabitRecord]
 
+    @State private var showWeeklyReview = false
+
     private var activeHabits: [Habit] { habits.filter(\.isActive) }
     private var failureRecords: [HabitRecord] {
         allRecords
@@ -16,7 +18,7 @@ struct RecordsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                WeeklyReviewCard(habits: activeHabits, allRecords: allRecords)
+                weeklyReviewButton
                 overallStatsCard
                 habitPieSection
                 habitStreakList
@@ -29,6 +31,47 @@ struct RecordsView: View {
             .padding(.vertical, 12)
         }
         .navigationTitle("기록")
+        .sheet(isPresented: $showWeeklyReview) {
+            WeeklyReviewSheet(habits: activeHabits, allRecords: allRecords)
+        }
+    }
+
+    // MARK: - Weekly Review Button
+
+    private var weeklyReviewButton: some View {
+        Button {
+            showWeeklyReview = true
+        } label: {
+            HStack {
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.title3)
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        LinearGradient(colors: [Color(hex: "#74B9FF") ?? .blue,
+                                                Color(hex: "#5352ED") ?? .indigo],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("주간 리뷰 보기")
+                        .font(.system(.subheadline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.primary)
+                    Text("이번 주 성과를 한눈에 확인해요")
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(Color.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Color.secondary)
+            }
+            .padding(14)
+            .cardBackground()
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 전체 통계 카드
@@ -358,7 +401,34 @@ extension View {
     }
 }
 
-// MARK: - Weekly Review Card
+// MARK: - Weekly Review Sheet
+
+struct WeeklyReviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let habits: [Habit]
+    let allRecords: [HabitRecord]
+
+    var body: some View {
+        NavigationStack {
+            WeeklyReviewCard(habits: habits, allRecords: allRecords)
+                .padding()
+                .navigationTitle("주간 리뷰")
+                #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("닫기") { dismiss() }.fontWeight(.semibold)
+                    }
+                }
+        }
+        #if os(iOS)
+        .presentationDetents([.medium])
+        #endif
+    }
+}
+
+// MARK: - Weekly Review Card (content)
 
 struct WeeklyReviewCard: View {
     let habits: [Habit]

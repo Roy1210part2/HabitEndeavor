@@ -1,22 +1,30 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class Habit {
     var name: String
-    var emoji: String       // 내 아이디어: 습관별 이모지 (예: 🏃 📚 🧘)
-    var sortOrder: Int      // 내 아이디어: 순서 변경 지원
+    var emoji: String
+    var sortOrder: Int
     var createdAt: Date
     var isActive: Bool
+    var colorHex: String?   // optional for migration compat
     @Relationship(deleteRule: .cascade) var records: [HabitRecord]
 
-    init(name: String, emoji: String = "⭐️", sortOrder: Int = 0) {
+    init(name: String, emoji: String = "⭐️", sortOrder: Int = 0, colorHex: String? = nil) {
         self.name = name
         self.emoji = emoji
         self.sortOrder = sortOrder
         self.createdAt = Date()
         self.isActive = true
+        self.colorHex = colorHex
         self.records = []
+    }
+
+    var displayColor: Color {
+        guard let hex = colorHex, let c = Color(hex: hex) else { return .blue }
+        return c
     }
 
     var thisWeekCompletionRate: Double {

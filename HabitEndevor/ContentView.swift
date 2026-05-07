@@ -61,6 +61,7 @@ struct MacContentView: View {
                 switch selectedTab {
                 case .checkbox: CheckboxView()
                 case .records:  RecordsView()
+                case .quests:   QuestView()
                 case .world:    WorldView()
                 case .settings: SettingsView()
                 }
@@ -72,13 +73,14 @@ struct MacContentView: View {
 // MARK: - Tab Model
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case checkbox, records, world, settings
+    case checkbox, records, quests, world, settings
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .checkbox: "체크박스"
         case .records:  "기록"
+        case .quests:   "퀘스트"
         case .world:    "세계"
         case .settings: "설정"
         }
@@ -88,6 +90,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .checkbox: "square.grid.2x2"
         case .records:  "chart.bar"
+        case .quests:   "trophy.fill"
         case .world:    "globe"
         case .settings: "gearshape"
         }

@@ -9,6 +9,7 @@ struct AddHabitSheet: View {
 
     @State private var name = ""
     @State private var emoji = "⭐️"
+    @State private var selectedColorHex = habitColorPalette[5]  // 하늘색 기본
     @State private var showEmojiPicker = false
 
     private var canSave: Bool {
@@ -20,14 +21,14 @@ struct AddHabitSheet: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        Button {
-                            showEmojiPicker = true
-                        } label: {
-                            Text(emoji)
-                                .font(.title2)
-                                .frame(width: 44, height: 44)
-                                .background(Color.secondary.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        // 이모지 + 색상 프리뷰 버튼
+                        Button { showEmojiPicker = true } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color(hex: selectedColorHex) ?? .blue)
+                                    .frame(width: 48, height: 48)
+                                Text(emoji).font(.title2)
+                            }
                         }
                         .buttonStyle(.plain)
 
@@ -42,6 +43,10 @@ struct AddHabitSheet: View {
                     Section("이모지 선택") {
                         EmojiPickerView(selected: $emoji, onSelect: { showEmojiPicker = false })
                     }
+                }
+
+                Section("색상 선택") {
+                    ColorPaletteView(selectedHex: $selectedColorHex)
                 }
             }
             .navigationTitle("습관 추가")
@@ -68,10 +73,48 @@ struct AddHabitSheet: View {
         let habit = Habit(
             name: name.trimmingCharacters(in: .whitespaces),
             emoji: emoji,
-            sortOrder: nextSortOrder
+            sortOrder: nextSortOrder,
+            colorHex: selectedColorHex
         )
         modelContext.insert(habit)
         dismiss()
+    }
+}
+
+// MARK: - Color Palette Picker
+
+struct ColorPaletteView: View {
+    @Binding var selectedHex: String
+
+    private let columns = Array(repeating: GridItem(.flexible()), count: 6)
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(habitColorPalette, id: \.self) { hex in
+                let color = Color(hex: hex) ?? .blue
+                ZStack {
+                    Circle().fill(color).frame(width: 36, height: 36)
+                    if selectedHex == hex {
+                        Circle()
+                            .strokeBorder(Color.primary, lineWidth: 2)
+                            .frame(width: 40, height: 40)
+                        Circle()
+                            .fill(.white.opacity(0.35))
+                            .frame(width: 36, height: 36)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+                .onTapGesture {
+                    selectedHex = hex
+                    #if os(iOS)
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    #endif
+                }
+                .animation(.spring(response: 0.2), value: selectedHex)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
@@ -81,9 +124,8 @@ struct EmojiPickerView: View {
     @Binding var selected: String
     let onSelect: () -> Void
 
-    // 자주 쓰는 습관 이모지 선별
     private let emojis = [
-        "✅", "⭐️", "🔥", "💪", "🏃", "🧘", "📚", "✍️",
+        "⭐️", "🔥", "💪", "🏃", "🧘", "📚", "✍️",
         "🎯", "🎨", "🎵", "🍎", "💧", "😴", "🧹", "💻",
         "📝", "🏋️", "🚴", "🌱", "🧠", "❤️", "💊", "🛁",
         "☀️", "🌙", "🍵", "🥗", "🚫", "🙏", "📖", "🎤",

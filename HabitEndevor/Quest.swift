@@ -78,7 +78,7 @@ let allQuestDefinitions: [QuestDefinition] = [
     QuestDefinition(type: .streak66,  title: "진짜 습관",         description: "66일 연속 달성 — 뇌가 바뀌는 날",      icon: "👑", coinReward:   100_000, countryRewards: 5, category: .streak,  targetValue: 66),
     // MARK: Total
     QuestDefinition(type: .total1,    title: "시작이 반",         description: "첫 번째 체크인",                       icon: "🌱", coinReward:       500, countryRewards: 0, category: .total,   targetValue: 1),
-    QuestDefinition(type: .total10,   title: "입문자",            description: "총 10회 체크인",                       icon: "✅", coinReward:     2_000, countryRewards: 0, category: .total,   targetValue: 10),
+    QuestDefinition(type: .total10,   title: "입문자",            description: "총 10회 체크인",                       icon: "📊", coinReward:     2_000, countryRewards: 0, category: .total,   targetValue: 10),
     QuestDefinition(type: .total50,   title: "성실러",            description: "총 50회 체크인",                       icon: "💪", coinReward:     5_000, countryRewards: 1, category: .total,   targetValue: 50),
     QuestDefinition(type: .total100,  title: "백회 용사",         description: "총 100회 체크인",                      icon: "🎖️", coinReward:   10_000, countryRewards: 1, category: .total,   targetValue: 100),
     QuestDefinition(type: .total365,  title: "365일의 기적",      description: "총 365회 체크인",                      icon: "🌏", coinReward:    50_000, countryRewards: 5, category: .total,   targetValue: 365),
