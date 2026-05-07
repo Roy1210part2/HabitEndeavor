@@ -29,20 +29,31 @@ struct IOSContentView: View {
         TabView {
             NavigationStack { CheckboxView() }
                 .tabItem { Label("체크박스", systemImage: "square.grid.2x2") }
+                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
 
             NavigationStack { RecordsView() }
                 .tabItem { Label("기록", systemImage: "chart.bar") }
+                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
 
             NavigationStack { QuestView() }
                 .tabItem { Label("퀘스트", systemImage: "trophy.fill") }
+                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
 
             NavigationStack { WorldView() }
                 .tabItem { Label("세계", systemImage: "globe") }
+                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("설정", systemImage: "gearshape") }
+                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
         }
-        .background(Color(.systemBackground).ignoresSafeArea())
+        .toolbarBackground(Color(.systemBackground), for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
     }
 }
 

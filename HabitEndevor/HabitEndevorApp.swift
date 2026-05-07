@@ -7,7 +7,9 @@ struct HabitEndevorApp: App {
 
     init() {
         #if os(iOS)
-        // TabBar와 NavigationBar가 safe area를 검은색으로 채우지 않도록 설정
+        // 윈도우 배경 = 흰색/다크모드 배경 (safe area 영역 포함 모두 채움)
+        UIWindow.appearance().backgroundColor = UIColor.systemBackground
+
         let tabBar = UITabBarAppearance()
         tabBar.configureWithDefaultBackground()
         UITabBar.appearance().standardAppearance   = tabBar
@@ -15,10 +17,10 @@ struct HabitEndevorApp: App {
 
         let navBar = UINavigationBarAppearance()
         navBar.configureWithDefaultBackground()
-        UINavigationBar.appearance().standardAppearance        = navBar
-        UINavigationBar.appearance().scrollEdgeAppearance      = navBar
-        UINavigationBar.appearance().compactAppearance         = navBar
-        UINavigationBar.appearance().compactScrollEdgeAppearance = navBar
+        UINavigationBar.appearance().standardAppearance           = navBar
+        UINavigationBar.appearance().scrollEdgeAppearance         = navBar
+        UINavigationBar.appearance().compactAppearance            = navBar
+        UINavigationBar.appearance().compactScrollEdgeAppearance  = navBar
         #endif
     }
 
