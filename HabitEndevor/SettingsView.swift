@@ -25,6 +25,15 @@ struct SettingsForm: View {
     @State private var notificationEnabled = false
     @State private var showPermissionAlert = false
 
+    private var streakRescueBinding: Binding<Bool> {
+        Binding(get: { settings.streakRescueEnabled ?? false },
+                set: { settings.streakRescueEnabled = $0 })
+    }
+    private var weeklyReviewBinding: Binding<Bool> {
+        Binding(get: { settings.weeklyReviewEnabled ?? false },
+                set: { settings.weeklyReviewEnabled = $0 })
+    }
+
     private var notificationTime: Binding<Date> {
         Binding(
             get: {
@@ -103,10 +112,10 @@ struct SettingsForm: View {
                         HStack {
                             Text("스트릭 위기 알림 (22:00)").font(.body)
                             Spacer()
-                            Toggle("", isOn: $settings.streakRescueEnabled)
+                            Toggle("", isOn: streakRescueBinding)
                                 .labelsHidden()
                                 .onChange(of: settings.streakRescueEnabled) { _, on in
-                                    on ? scheduleStreakRescue() : cancelStreakRescue()
+                                    (on ?? false) ? scheduleStreakRescue() : cancelStreakRescue()
                                 }
                         }
                         .padding(.vertical, 4)
@@ -114,10 +123,10 @@ struct SettingsForm: View {
                         HStack {
                             Text("주간 성과 알림 (월요일 09:00)").font(.body)
                             Spacer()
-                            Toggle("", isOn: $settings.weeklyReviewEnabled)
+                            Toggle("", isOn: weeklyReviewBinding)
                                 .labelsHidden()
                                 .onChange(of: settings.weeklyReviewEnabled) { _, on in
-                                    on ? scheduleWeeklyReview() : cancelWeeklyReview()
+                                    (on ?? false) ? scheduleWeeklyReview() : cancelWeeklyReview()
                                 }
                         }
                         .padding(.vertical, 4)
@@ -196,13 +205,13 @@ struct SettingsForm: View {
                     DatePicker("알림 시간",
                                selection: notificationTime,
                                displayedComponents: .hourAndMinute)
-                    Toggle("스트릭 위기 알림 (22:00)", isOn: $settings.streakRescueEnabled)
+                    Toggle("스트릭 위기 알림 (22:00)", isOn: streakRescueBinding)
                         .onChange(of: settings.streakRescueEnabled) { _, on in
-                            on ? scheduleStreakRescue() : cancelStreakRescue()
+                            (on ?? false) ? scheduleStreakRescue() : cancelStreakRescue()
                         }
-                    Toggle("주간 성과 알림 (월요일 09:00)", isOn: $settings.weeklyReviewEnabled)
+                    Toggle("주간 성과 알림 (월요일 09:00)", isOn: weeklyReviewBinding)
                         .onChange(of: settings.weeklyReviewEnabled) { _, on in
-                            on ? scheduleWeeklyReview() : cancelWeeklyReview()
+                            (on ?? false) ? scheduleWeeklyReview() : cancelWeeklyReview()
                         }
                 }
             }
