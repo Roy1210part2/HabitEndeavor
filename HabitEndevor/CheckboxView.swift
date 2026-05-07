@@ -151,14 +151,14 @@ struct CheckboxView: View {
 
     private var weekHeaderRow: some View {
         HStack(spacing: 0) {
-            Spacer().frame(width: 118)
+            Spacer().frame(width: 100)
             ForEach(weekDates, id: \.self) { date in
-                VStack(spacing: 4) {
+                VStack(spacing: 3) {
                     Text(date.koreanWeekday())
-                        .font(.system(size: 13, weight: date.isToday ? .semibold : .regular, design: .rounded))
+                        .font(.system(size: 11, weight: date.isToday ? .semibold : .regular, design: .rounded))
                         .foregroundStyle(date.isToday ? Color.primary : Color.secondary)
                     Text("\(date.dayNumber())")
-                        .font(.system(size: 18, weight: date.isToday ? .bold : .medium, design: .rounded))
+                        .font(.system(size: 15, weight: date.isToday ? .bold : .medium, design: .rounded))
                         .foregroundStyle(date.isToday ? Color.primary : Color.secondary)
                 }
                 .frame(maxWidth: .infinity)
@@ -289,23 +289,22 @@ struct HabitRowView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 8) {
-                // 색상 바
+            HStack(spacing: 6) {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(habit.displayColor)
-                    .frame(width: 4, height: 32)
-                VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: 3, height: 28)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(habit.name)
-                        .font(.system(.body, design: .rounded))
+                        .font(.system(.subheadline, design: .rounded))
                         .fontWeight(.semibold)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Text("\(Int(weeklyRate * 100))%")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(Color.secondary)
                 }
             }
-            .frame(width: 118, alignment: .leading)
+            .frame(width: 100, alignment: .leading)
 
             ForEach(weekDates, id: \.self) { date in
                 let rec = records.first { $0.date == date }
@@ -354,25 +353,25 @@ struct CheckboxCell: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 7)
+            RoundedRectangle(cornerRadius: 6)
                 .fill(fillColor)
 
-            RoundedRectangle(cornerRadius: 7)
+            RoundedRectangle(cornerRadius: 6)
                 .stroke(strokeColor, lineWidth: 1.5)
 
             if hasRecord {
                 Image(systemName: isChecked ? "checkmark" : "xmark")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(isChecked ? Color(white: 1.0) : Color.red)
             }
         }
-        .frame(width: 36, height: 36)
+        .frame(width: 32, height: 32)
         .opacity(isFuture ? 0.35 : 1.0)
         .background(
             isToday
-                ? RoundedRectangle(cornerRadius: 9)
+                ? RoundedRectangle(cornerRadius: 8)
                     .fill(Color.primary.opacity(0.06))
-                    .padding(-4)
+                    .padding(-3)
                 : nil
         )
     }
@@ -422,8 +421,8 @@ struct BentoHeatmap: View {
     private func cellColor(_ c: DayCellData) -> Color {
         switch c.mark {
         case .checked: return accentColor.opacity(0.85)
-        case .failed:  return Color.red.opacity(0.3)
-        case .empty:   return Color.primary.opacity(0.07)
+        case .failed:  return Color.primary.opacity(0.15) // 무채색 톤
+        case .empty:   return Color.primary.opacity(0.04) // 무채색 톤
         }
     }
 }
@@ -524,13 +523,12 @@ struct HabitStatsCard: View {
             .padding(.vertical, 8)
         }
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.cardBackground)
-                .shadow(color: .black.opacity(0.07), radius: 6, x: 0, y: 2)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(habit.displayColor.opacity(0.25), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
         )
     }
 
@@ -579,16 +577,16 @@ struct CombinedHeatmapGrid: View {
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("28일 히트맵")
-                .font(.system(.subheadline, design: .rounded))
-                .fontWeight(.semibold)
+                .font(.system(.headline, design: .rounded))
+                .fontWeight(.bold)
 
             if habits.isEmpty {
                 Text("습관을 추가해보세요")
                     .font(.subheadline).foregroundStyle(Color.secondary)
             } else {
-                LazyVGrid(columns: cols, spacing: 8) {
+                LazyVGrid(columns: cols, spacing: 12) {
                     ForEach(habits) { habit in
                         HabitMiniCard(
                             habit: habit,
@@ -596,23 +594,22 @@ struct CombinedHeatmapGrid: View {
                                 $0.habit?.persistentModelID == habit.persistentModelID
                             }
                         )
-                        .aspectRatio(1, contentMode: .fit)
+                        .aspectRatio(1, contentMode: .fit) // 작은 정사각형
                     }
                 }
             }
         }
-        .padding(14)
+        .padding(20)
         // 전체 카드를 정사각형으로: ScrollView 안에서도 올바르게 작동
         .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.cardBackground)
-                .shadow(color: .black.opacity(0.07), radius: 6, x: 0, y: 2)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(.ultraThinMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
         )
     }
 }
@@ -642,30 +639,30 @@ struct HabitMiniCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             // 이름 헤더
-            HStack(spacing: 3) {
-                RoundedRectangle(cornerRadius: 2)
+            HStack(spacing: 4) {
+                Circle()
                     .fill(habit.displayColor)
-                    .frame(width: 3, height: 14)
+                    .frame(width: 8, height: 8)
                 Text(habit.name)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .foregroundStyle(Color.primary)
                 Spacer(minLength: 0)
                 if streak > 0 {
-                    HStack(spacing: 1) {
-                        Image(systemName: "flame.fill").font(.system(size: 8)).foregroundStyle(.orange)
-                        Text("\(streak)").font(.system(size: 9, weight: .bold, design: .rounded)).foregroundStyle(.orange)
+                    HStack(spacing: 2) {
+                        Image(systemName: "flame.fill").font(.system(size: 10)).foregroundStyle(Color.primary.opacity(0.6))
+                        Text("\(streak)").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.8))
                     }
                 }
             }
 
             BentoHeatmap(cells: heatmapCells, accentColor: habit.displayColor)
         }
-        .padding(7)
-        .background(RoundedRectangle(cornerRadius: 10).fill(habit.displayColor.opacity(0.06)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(habit.displayColor.opacity(0.3), lineWidth: 1))
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.primary.opacity(0.03)))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.primary.opacity(0.05), lineWidth: 1))
     }
 }
 
