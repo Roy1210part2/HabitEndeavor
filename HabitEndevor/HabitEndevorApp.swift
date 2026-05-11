@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct HabitEndevorApp: App {
+struct HabitEndeavorApp: App {
     var sharedModelContainer: ModelContainer = makeContainer()
 
     init() {
@@ -46,7 +46,7 @@ struct HabitEndevorApp: App {
     // iCloud 연동 방법:
     // 1. Xcode → Target → Signing & Capabilities → + Capability → iCloud
     // 2. CloudKit 체크박스 활성화
-    // 3. Containers에 "iCloud.co.lyu.HabitEndevor" 추가
+    // 3. Containers에 "iCloud.co.lyu.HabitEndeavor" 추가
     // 위 설정이 없으면 자동으로 로컬 저장소로 폴백됩니다.
 
     private static func makeContainer() -> ModelContainer {
@@ -63,7 +63,7 @@ struct HabitEndevorApp: App {
         let cloudConfig = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
-            cloudKitDatabase: .private("iCloud.co.lyu.HabitEndevor")
+            cloudKitDatabase: .private("iCloud.co.lyu.HabitEndeavor")
         )
         if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
             return container

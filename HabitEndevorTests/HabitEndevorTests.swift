@@ -1,14 +1,14 @@
 //
-//  HabitEndevorTests.swift
-//  HabitEndevorTests
+//  HabitEndeavorTests.swift
+//  HabitEndeavorTests
 //
 //  Created by 류성균 on 5/6/26.
 //
 
 import XCTest
-@testable import HabitEndevor
+@testable import HabitEndeavor
 
-final class HabitEndevorTests: XCTestCase {
+final class HabitEndeavorTests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

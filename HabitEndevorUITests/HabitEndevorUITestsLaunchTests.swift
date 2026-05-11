@@ -1,13 +1,13 @@
 //
-//  HabitEndevorUITestsLaunchTests.swift
-//  HabitEndevorUITests
+//  HabitEndeavorUITestsLaunchTests.swift
+//  HabitEndeavorUITests
 //
 //  Created by 류성균 on 5/6/26.
 //
 
 import XCTest
 
-final class HabitEndevorUITestsLaunchTests: XCTestCase {
+final class HabitEndeavorUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
