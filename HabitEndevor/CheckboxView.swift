@@ -14,6 +14,8 @@ struct CheckboxView: View {
     @State private var selectedRecord: HabitRecord?
     @State private var editingHabit: Habit?
     @State private var burstMap: [PersistentIdentifier: Date] = [:]
+    // 🔴 핵심 최적화: habitID → [HabitRecord] 딕셔너리 (한 번만 빌드, O(1) 조회)
+    @State private var recordsByHabit: [PersistentIdentifier: [HabitRecord]] = [:]
 
     private var settings: AppSettings {
         settingsArray.first ?? AppSettings()
@@ -102,7 +104,11 @@ struct CheckboxView: View {
                 context: modelContext
             )
         }
-        .onAppear { assignMissingColors() }
+        .onAppear {
+            buildRecordIndex(allRecords)
+            assignMissingColors()
+        }
+        .onChange(of: allRecords) { _, new in buildRecordIndex(new) }
     }
 
     // 색상 없는 습관에 팔레트 색상 자동 배정
@@ -196,28 +202,36 @@ struct CheckboxView: View {
 
             CombinedHeatmapGrid(
                 habits: habits.filter(\.isActive),
-                allRecords: allRecords
+                recordsByHabit: recordsByHabit
             )
 
             HabitTrendChart(
                 habits: habits.filter(\.isActive),
-                allRecords: allRecords
+                recordsByHabit: recordsByHabit
             )
         }
         .padding(.bottom, 32)
     }
 
+    // MARK: - Record Index (O(1) lookup)
+
+    private func buildRecordIndex(_ records: [HabitRecord]) {
+        var d: [PersistentIdentifier: [HabitRecord]] = [:]
+        for r in records {
+            if let id = r.habit?.persistentModelID { d[id, default: []].append(r) }
+        }
+        recordsByHabit = d
+    }
+
     // MARK: - Helpers
 
     private func records(for habit: Habit) -> [HabitRecord] {
-        allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
+        recordsByHabit[habit.persistentModelID] ?? []
     }
 
     private func record(for habit: Habit, on date: Date) -> HabitRecord? {
         let dayStart = Calendar.current.startOfDay(for: date)
-        return allRecords.first {
-            $0.habit?.persistentModelID == habit.persistentModelID && $0.date == dayStart
-        }
+        return (recordsByHabit[habit.persistentModelID] ?? []).first { $0.date == dayStart }
     }
 
     // MARK: - Tap Logic: empty → checked → X → empty
@@ -579,7 +593,7 @@ struct RingProgressView: View {
 
 struct CombinedHeatmapGrid: View {
     let habits: [Habit]
-    let allRecords: [HabitRecord]
+    let recordsByHabit: [PersistentIdentifier: [HabitRecord]]
 
     private let cols = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
 
@@ -597,11 +611,9 @@ struct CombinedHeatmapGrid: View {
                     ForEach(habits) { habit in
                         HabitMiniCard(
                             habit: habit,
-                            records: allRecords.filter {
-                                $0.habit?.persistentModelID == habit.persistentModelID
-                            }
+                            records: recordsByHabit[habit.persistentModelID] ?? []
                         )
-                        .aspectRatio(1, contentMode: .fit) // 작은 정사각형
+                        .aspectRatio(1, contentMode: .fit)
                     }
                 }
             }
@@ -708,7 +720,7 @@ struct CheckmarkBurst: View {
 
 struct HabitTrendChart: View {
     let habits: [Habit]
-    let allRecords: [HabitRecord]
+    let recordsByHabit: [PersistentIdentifier: [HabitRecord]]
 
     private let weekLabels = ["4주전", "3주전", "2주전", "이번주"]
 
@@ -721,28 +733,29 @@ struct HabitTrendChart: View {
         let rate: Double
     }
 
-    private func weeklyRate(for habit: Habit, weekOffset: Int) -> Double {
+    // 🔴 수정: allRecords 전체 스캔 제거 → 딕셔너리 O(1) 조회
+    private func weeklyRate(habitRecords: [HabitRecord], weekOffset: Int) -> Double {
         let cal = Calendar.current
         let today = Date.todayStart
-        let recs = allRecords.filter { $0.habit?.persistentModelID == habit.persistentModelID }
         var checked = 0, total = 7
         for d in 0..<7 {
             guard let date = cal.date(byAdding: .day, value: -(weekOffset * 7 + d), to: today) else { continue }
             if date > today { total -= 1; continue }
-            if recs.first(where: { $0.date == date })?.isChecked == true { checked += 1 }
+            if habitRecords.first(where: { $0.date == date })?.isChecked == true { checked += 1 }
         }
         return total > 0 ? Double(checked) / Double(total) : 0
     }
 
     private var trendData: [TrendPoint] {
         habits.flatMap { habit in
-            (0..<4).map { offset in
+            let recs = recordsByHabit[habit.persistentModelID] ?? []
+            return (0..<4).map { offset in
                 TrendPoint(
                     habitID: habit.persistentModelID,
                     seriesName: habit.name,
                     color: habit.displayColor,
                     weekIndex: 3 - offset,
-                    rate: weeklyRate(for: habit, weekOffset: offset)
+                    rate: weeklyRate(habitRecords: recs, weekOffset: offset)
                 )
             }
         }

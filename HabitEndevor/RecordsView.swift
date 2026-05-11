@@ -8,6 +8,13 @@ struct RecordsView: View {
 
     @State private var showWeeklyReview = false
 
+    // 🟠 캐시: computed property 매 렌더 실행 → onChange 시만 재계산
+    @State private var cachedCheckins:    Int    = 0
+    @State private var cachedBestStreak:  Int    = 0
+    @State private var cachedOverallRate: Double = 0
+    @State private var cachedPieData:     [PieItem]     = []
+    @State private var cachedWeekdayData: [WeekdayItem] = []
+
     private var activeHabits: [Habit] { habits.filter(\.isActive) }
     private var failureRecords: [HabitRecord] {
         allRecords
@@ -34,6 +41,18 @@ struct RecordsView: View {
         .sheet(isPresented: $showWeeklyReview) {
             WeeklyReviewSheet(habits: activeHabits, allRecords: allRecords)
         }
+        .onAppear { recompute() }
+        .onChange(of: allRecords) { _, _ in recompute() }
+        .onChange(of: habits)     { _, _ in recompute() }
+    }
+
+    private func recompute() {
+        let active = activeHabits
+        cachedCheckins    = StatisticsManager.checkedCount(from: allRecords)
+        cachedBestStreak  = StatisticsManager.bestLongestStreak(habits: active)
+        cachedOverallRate = StatisticsManager.overallRate(from: allRecords)
+        cachedPieData     = StatisticsManager.pieData(activeHabits: active, records: allRecords)
+        cachedWeekdayData = StatisticsManager.weekdayData(activeHabits: active, records: allRecords)
     }
 
     // MARK: - Weekly Review Button
@@ -241,13 +260,13 @@ struct RecordsView: View {
         .cardBackground()
     }
 
-    // MARK: - Computed Stats (StatisticsManager에 위임)
+    // MARK: - Computed Stats (캐시 참조 — recompute()에서만 갱신)
 
-    private var totalCheckins:     Int    { StatisticsManager.checkedCount(from: allRecords) }
-    private var bestLongestStreak: Int    { StatisticsManager.bestLongestStreak(habits: activeHabits) }
-    private var overallRate:       Double { StatisticsManager.overallRate(from: allRecords) }
-    private var pieChartData:      [PieItem]     { StatisticsManager.pieData(activeHabits: activeHabits, records: allRecords) }
-    private var weekdayData:       [WeekdayItem] { StatisticsManager.weekdayData(activeHabits: activeHabits, records: allRecords) }
+    private var totalCheckins:     Int    { cachedCheckins    }
+    private var bestLongestStreak: Int    { cachedBestStreak  }
+    private var overallRate:       Double { cachedOverallRate }
+    private var pieChartData:      [PieItem]     { cachedPieData     }
+    private var weekdayData:       [WeekdayItem] { cachedWeekdayData }
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
@@ -263,14 +282,13 @@ struct RecordsView: View {
 struct HabitStreakRow: View {
     let habit: Habit
 
-    private var successRate: Double {
-        let total = habit.records.count
-        guard total > 0 else { return 0 }
-        return Double(StreakService.totalCheckedDays(for: habit)) / Double(total)
-    }
-
     var body: some View {
-        HStack(spacing: 12) {
+        // computeAll로 habit.records 단 1회 접근 (기존 3회 → 1회)
+        let s = StreakService.computeAll(for: habit)
+        let recordCount = habit.records.count
+        let rate = recordCount > 0 ? Double(s.total) / Double(recordCount) : 0.0
+
+        return HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 2)
                 .fill(habit.displayColor)
                 .frame(width: 3, height: 24)
@@ -282,25 +300,23 @@ struct HabitStreakRow: View {
 
             HStack(spacing: 20) {
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text("\(Int(successRate * 100))%")
+                    Text("\(Int(rate * 100))%")
                         .font(.body)
                         .fontWeight(.semibold)
                     Text("성공률")
                         .font(.caption)
                         .foregroundStyle(Color.secondary)
                 }
-
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text("\(StreakService.currentStreak(for: habit))일")
+                    Text("\(s.current)일")
                         .font(.body)
                         .fontWeight(.semibold)
                     Text("현재")
                         .font(.caption)
                         .foregroundStyle(Color.secondary)
                 }
-
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text("\(StreakService.longestStreak(for: habit))일")
+                    Text("\(s.longest)일")
                         .font(.body)
                         .fontWeight(.medium)
                         .foregroundStyle(Color.secondary)
