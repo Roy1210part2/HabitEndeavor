@@ -56,6 +56,7 @@ struct HabitEndevorApp: App {
             PurchasedCountry.self,
             AppSettings.self,
             CompletedQuest.self,
+            ScheduleItem.self,
         ])
 
         // CloudKit 동기화 시도 (.automatic은 entitlement에서 컨테이너를 자동 선택)

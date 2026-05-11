@@ -12,6 +12,7 @@ struct CheckboxView: View {
 
     @State private var showAddHabit = false
     @State private var selectedRecord: HabitRecord?
+    @State private var editingHabit: Habit?
     @State private var burstMap: [PersistentIdentifier: Date] = [:]
 
     private var settings: AppSettings {
@@ -41,7 +42,8 @@ struct CheckboxView: View {
                         records: records(for: habit),
                         burstDate: burstMap[habit.persistentModelID],
                         onTap: { date in handleTap(habit: habit, date: date) },
-                        onLongPress: { date in handleLongPress(habit: habit, date: date) }
+                        onLongPress: { date in handleLongPress(habit: habit, date: date) },
+                        onEdit: { editingHabit = habit }
                     )
                     Divider()
                 }
@@ -87,6 +89,9 @@ struct CheckboxView: View {
         }
         .sheet(item: $selectedRecord) { record in
             FailureNoteSheet(record: record)
+        }
+        .sheet(item: $editingHabit) { habit in
+            EditHabitSheet(habit: habit)
         }
         .onChange(of: allRecords) { _, _ in
             QuestService.checkAndComplete(
@@ -274,6 +279,7 @@ struct HabitRowView: View {
     let burstDate: Date?
     let onTap: (Date) -> Void
     let onLongPress: (Date) -> Void
+    var onEdit: (() -> Void)? = nil
 
     private var pastAndTodayDates: [Date] {
         weekDates.filter { !$0.isFuture }
@@ -305,6 +311,8 @@ struct HabitRowView: View {
                 }
             }
             .frame(width: 100, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { onEdit?() }
 
             ForEach(weekDates, id: \.self) { date in
                 let rec = records.first { $0.date == date }
@@ -481,7 +489,6 @@ struct HabitStatsCard: View {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(habit.displayColor)
                     .frame(width: 4, height: 22)
-                Text(habit.emoji).font(.title3)
                 Text(habit.name)
                     .font(.system(.subheadline, design: .rounded))
                     .fontWeight(.semibold)
@@ -732,7 +739,7 @@ struct HabitTrendChart: View {
             (0..<4).map { offset in
                 TrendPoint(
                     habitID: habit.persistentModelID,
-                    seriesName: "\(habit.emoji) \(habit.name)",
+                    seriesName: habit.name,
                     color: habit.displayColor,
                     weekIndex: 3 - offset,
                     rate: weeklyRate(for: habit, weekOffset: offset)
@@ -807,7 +814,7 @@ struct HabitTrendChart: View {
                             RoundedRectangle(cornerRadius: 2)
                                 .fill(habit.displayColor)
                                 .frame(width: 18, height: 3)
-                            Text("\(habit.emoji) \(habit.name)")
+                            Text(habit.name)
                                 .font(.system(size: 10, design: .rounded))
                                 .foregroundStyle(Color.secondary)
                                 .lineLimit(1)

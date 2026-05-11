@@ -114,6 +114,7 @@ struct RecordsView: View {
                     .padding(.bottom, 16)
             } else {
                 HStack(alignment: .center, spacing: 20) {
+                    // 각 습관의 displayColor로 파이 조각 색상 결정
                     Chart(pieChartData) { item in
                         SectorMark(
                             angle: .value("습관 성공", item.count),
@@ -121,11 +122,7 @@ struct RecordsView: View {
                             angularInset: 2.5
                         )
                         .cornerRadius(4)
-                        .foregroundStyle(
-                            item.index % 2 == 0
-                                ? Color.primary.opacity(0.85)
-                                : Color.primary.opacity(0.4)
-                        )
+                        .foregroundStyle(item.habitColor)
                     }
                     .frame(width: 160, height: 160)
 
@@ -133,9 +130,7 @@ struct RecordsView: View {
                         ForEach(pieChartData) { item in
                             HStack(spacing: 8) {
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(item.index % 2 == 0
-                                        ? Color.primary.opacity(0.85)
-                                        : Color.primary.opacity(0.4))
+                                    .fill(item.habitColor)
                                     .frame(width: 10, height: 10)
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(item.habitName)
@@ -174,7 +169,7 @@ struct RecordsView: View {
         .cardBackground()
     }
 
-    // MARK: - 요일별 달성률 차트
+    // MARK: - 요일별 달성률 차트 (의미 기반 색상: 70%+ 초록, 미만 빨강)
 
     private var weekdayChart: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -185,12 +180,29 @@ struct RecordsView: View {
                     x: .value("요일", item.label),
                     y: .value("달성률", item.rate)
                 )
-                .foregroundStyle(Color.primary.opacity(0.8))
+                .foregroundStyle(rateColor(item.rate))
                 .cornerRadius(5)
+                .annotation(position: .top) {
+                    if item.rate > 0 {
+                        Text("\(Int(item.rate * 100))%")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(Color.secondary)
+                    }
+                }
+
+                // 70% 목표 기준선
+                RuleMark(y: .value("목표", 0.7))
+                    .foregroundStyle(Color.primary.opacity(0.25))
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .annotation(position: .trailing, alignment: .leading) {
+                        Text("70%")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color.secondary)
+                    }
             }
             .chartYScale(domain: 0...1)
             .chartYAxis {
-                AxisMarks(values: [0, 0.25, 0.5, 0.75, 1.0]) { value in
+                AxisMarks(values: [0, 0.5, 1.0]) { value in
                     AxisGridLine()
                     AxisValueLabel {
                         if let v = value.as(Double.self) {
@@ -199,12 +211,22 @@ struct RecordsView: View {
                     }
                 }
             }
-            .frame(height: 180)
+            .frame(height: 200)
             .padding(.bottom, 8)
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
         .cardBackground()
+    }
+
+    private func rateColor(_ rate: Double) -> Color {
+        // 0% = 빨강, 70%+ = 초록, 그 사이 보간
+        let t = min(rate / 0.7, 1.0)
+        return Color(
+            red:   0.95 - 0.77 * t,
+            green: 0.23 + 0.57 * t,
+            blue:  0.23 - 0.02 * t
+        )
     }
 
     // MARK: - 실패 사유 로그
@@ -252,6 +274,7 @@ struct RecordsView: View {
                 id: habit.persistentModelID.hashValue,
                 index: idx,
                 habitName: habit.name,
+                habitColor: habit.displayColor,
                 count: count,
                 rate: rate
             )
@@ -303,8 +326,9 @@ struct HabitStreakRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text(habit.emoji)
-                .font(.body)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(habit.displayColor)
+                .frame(width: 3, height: 24)
             Text(habit.name)
                 .font(.body)
                 .lineLimit(1)
@@ -362,9 +386,10 @@ struct FailureLogRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 5) {
-                Text(habit.emoji)
-                    .font(.footnote)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(habit.displayColor)
+                    .frame(width: 3, height: 14)
                 Text(habit.name)
                     .font(.footnote)
                     .fontWeight(.medium)
@@ -387,17 +412,14 @@ struct FailureLogRow: View {
 
 extension View {
     func cardBackground() -> some View {
-        #if os(iOS)
         self
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
-        #else
-        self
-            .background(Color(.windowBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .shadow(color: .black.opacity(0.09), radius: 8, x: 0, y: 2)
-        #endif
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -614,8 +636,10 @@ struct HabitSpotlightPage: View {
             Text(title).font(.system(size: 16, weight: .semibold, design: .rounded)).foregroundStyle(.white.opacity(0.8))
 
             if let habit = habit {
-                Text(habit.emoji).font(.system(size: 72))
-                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                Circle()
+                    .fill(habit.displayColor)
+                    .frame(width: 80, height: 80)
+                    .shadow(color: habit.displayColor.opacity(0.6), radius: 20, x: 0, y: 6)
 
                 Text(habit.name)
                     .font(.system(size: 32, weight: .black, design: .rounded))
@@ -709,7 +733,7 @@ struct WeeklyChartPage: View {
                 ForEach(habits) { habit in
                     HStack(spacing: 8) {
                         Circle().fill(habit.displayColor).frame(width: 8, height: 8)
-                        Text("\(habit.emoji) \(habit.name)")
+                        Text(habit.name)
                             .font(.system(size: 12, design: .rounded))
                             .foregroundStyle(.white.opacity(0.85))
                             .lineLimit(1)
@@ -785,6 +809,7 @@ struct PieItem: Identifiable {
     let id: Int
     let index: Int
     let habitName: String
+    let habitColor: Color
     let count: Int
     let rate: Double
 }

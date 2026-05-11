@@ -38,6 +38,16 @@ struct WorldView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // 3D 지구본 (구매 국가 시각화)
+                GlobeSceneView(ownedCodes: ownedCodes)
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
+
                 coinBalanceCard
                 progressCard
                 continentFilter

@@ -21,6 +21,24 @@ extension Color {
             blue:  Double( rgb & 0x0000FF       ) / 255
         )
     }
+
+    func toHex() -> String? {
+        #if os(macOS)
+        let nsColor = NSColor(self)
+        guard let components = nsColor.cgColor.components, components.count >= 3 else { return nil }
+        let r = Float(components[0])
+        let g = Float(components[1])
+        let b = Float(components[2])
+        #else
+        let uiColor = UIColor(self)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        #endif
+        return String(format: "#%02lX%02lX%02lX",
+                      lroundf(Float(r) * 255),
+                      lroundf(Float(g) * 255),
+                      lroundf(Float(b) * 255))
+    }
 }
 
 // 습관 색상 팔레트 (hex 문자열)

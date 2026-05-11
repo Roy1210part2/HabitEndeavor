@@ -24,6 +24,7 @@ struct ContentView: View {
 
 // MARK: - iOS / iPadOS
 
+#if os(iOS)
 struct IOSContentView: View {
     var body: some View {
         TabView {
@@ -34,6 +35,11 @@ struct IOSContentView: View {
 
             NavigationStack { RecordsView() }
                 .tabItem { Label("기록", systemImage: "chart.bar") }
+                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+
+            NavigationStack { ScheduleView() }
+                .tabItem { Label("일정", systemImage: "calendar") }
                 .toolbarBackground(Color(.systemBackground), for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
 
@@ -56,6 +62,7 @@ struct IOSContentView: View {
         .toolbarBackground(.visible, for: .tabBar)
     }
 }
+#endif
 
 // MARK: - macOS
 
@@ -74,6 +81,7 @@ struct MacContentView: View {
                 switch selectedTab {
                 case .checkbox: CheckboxView()
                 case .records:  RecordsView()
+                case .schedule: ScheduleView()
                 case .quests:   QuestView()
                 case .world:    WorldView()
                 case .settings: SettingsView()
@@ -87,13 +95,14 @@ struct MacContentView: View {
 // MARK: - Tab Model
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case checkbox, records, quests, world, settings
+    case checkbox, records, schedule, quests, world, settings
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .checkbox: "체크박스"
         case .records:  "기록"
+        case .schedule: "일정"
         case .quests:   "퀘스트"
         case .world:    "세계"
         case .settings: "설정"
@@ -104,6 +113,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .checkbox: "square.grid.2x2"
         case .records:  "chart.bar"
+        case .schedule: "calendar"
         case .quests:   "trophy.fill"
         case .world:    "globe"
         case .settings: "gearshape"

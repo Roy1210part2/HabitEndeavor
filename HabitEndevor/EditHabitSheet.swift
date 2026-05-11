@@ -1,16 +1,24 @@
 import SwiftUI
 import SwiftData
 
-struct AddHabitSheet: View {
+struct EditHabitSheet: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss)      private var dismiss
 
-    let nextSortOrder: Int
+    @Bindable var habit: Habit
 
-    @State private var name          = ""
-    @State private var selectedColor = Color.blue
+    @State private var name: String
+    @State private var selectedColor: Color
 
-    private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
+    init(habit: Habit) {
+        self.habit = habit
+        _name = State(initialValue: habit.name)
+        _selectedColor = State(initialValue: habit.displayColor)
+    }
+
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -22,6 +30,10 @@ struct AddHabitSheet: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(selectedColor)
                             .frame(width: 52, height: 52)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(selectedColor.opacity(0.4), lineWidth: 2)
+                            )
                             .shadow(color: selectedColor.opacity(0.4), radius: 8, x: 0, y: 4)
                             .animation(.spring(response: 0.3), value: selectedColor)
 
@@ -30,7 +42,7 @@ struct AddHabitSheet: View {
                                 .font(.system(.headline, design: .rounded))
                                 .fontWeight(.bold)
                                 .foregroundStyle(name.isEmpty ? Color.secondary : Color.primary)
-                            Text("새 습관 미리보기")
+                            Text("미리보기")
                                 .font(.caption)
                                 .foregroundStyle(Color.secondary)
                         }
@@ -40,17 +52,16 @@ struct AddHabitSheet: View {
                     .background(Color.primary.opacity(0.04))
                     .clipShape(RoundedRectangle(cornerRadius: 16))
 
-                    // 이름
+                    // 이름 편집
                     VStack(alignment: .leading, spacing: 10) {
                         Label("습관 이름", systemImage: "pencil")
                             .font(.system(.subheadline, design: .rounded))
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.secondary)
 
-                        TextField("습관 이름 (예: 운동, 독서)", text: $name)
+                        TextField("습관 이름을 입력하세요", text: $name)
                             .font(.system(.body, design: .rounded))
                             .submitLabel(.done)
-                            .onSubmit { if canSave { save() } }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 13)
                             .background(
@@ -59,14 +70,14 @@ struct AddHabitSheet: View {
                             )
                     }
 
-                    // 색상
+                    // 색상 편집
                     VStack(alignment: .leading, spacing: 10) {
                         Label("색상 선택", systemImage: "paintpalette")
                             .font(.system(.subheadline, design: .rounded))
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.secondary)
 
-                        ColorPicker("습관 색상을 선택하세요", selection: $selectedColor, supportsOpacity: false)
+                        ColorPicker("습관 색상", selection: $selectedColor, supportsOpacity: false)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 13)
                             .background(
@@ -100,10 +111,36 @@ struct AddHabitSheet: View {
                             }
                         }
                     }
+
+                    // 위험 구역
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("기타", systemImage: "exclamationmark.triangle")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.secondary)
+
+                        Button(role: .destructive) {
+                            habit.isActive = false
+                            try? modelContext.save()
+                            dismiss()
+                        } label: {
+                            Label("습관 비활성화", systemImage: "archivebox")
+                                .font(.system(.body, design: .rounded))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 13)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.red.opacity(0.08))
+                                )
+                                .foregroundStyle(Color.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 .padding(20)
             }
-            .navigationTitle("습관 추가")
+            .navigationTitle("습관 편집")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -112,7 +149,7 @@ struct AddHabitSheet: View {
                     Button("취소") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("추가") { save() }
+                    Button("저장") { save() }
                         .fontWeight(.semibold)
                         .disabled(!canSave)
                 }
@@ -125,47 +162,18 @@ struct AddHabitSheet: View {
     }
 
     private func save() {
-        let habit = Habit(
-            name: name.trimmingCharacters(in: .whitespaces),
-            sortOrder: nextSortOrder,
-            colorHex: selectedColor.toHex() ?? "#74B9FF"
-        )
-        modelContext.insert(habit)
+        habit.name     = name.trimmingCharacters(in: .whitespaces)
+        habit.colorHex = selectedColor.toHex() ?? habit.colorHex
+        try? modelContext.save()
         dismiss()
     }
 }
 
-// ColorPaletteView — 다른 곳에서도 재사용 가능하도록 유지
-
-struct ColorPaletteView: View {
-    @Binding var selectedHex: String
-
-    private let columns = Array(repeating: GridItem(.flexible()), count: 6)
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(habitColorPalette, id: \.self) { hex in
-                let c = Color(hex: hex) ?? .blue
-                let isSelected = selectedHex == hex
-                Circle()
-                    .fill(c)
-                    .frame(height: 36)
-                    .overlay(Circle().stroke(.white, lineWidth: isSelected ? 3 : 0).padding(3))
-                    .overlay(Circle().stroke(c, lineWidth: isSelected ? 2 : 0))
-                    .scaleEffect(isSelected ? 1.15 : 1.0)
-                    .animation(.spring(response: 0.25), value: isSelected)
-                    .onTapGesture {
-                        selectedHex = hex
-                        #if os(iOS)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
-                    }
-            }
-        }
-    }
-}
-
 #Preview {
-    AddHabitSheet(nextSortOrder: 0)
-        .modelContainer(for: Habit.self, inMemory: true)
+    let config = ModelConfiguration(isStoredInMemoryOnly: true)
+    let container = try! ModelContainer(for: Habit.self, configurations: config)
+    let habit = Habit(name: "운동", sortOrder: 0, colorHex: "#74B9FF")
+    container.mainContext.insert(habit)
+    return EditHabitSheet(habit: habit)
+        .modelContainer(container)
 }
