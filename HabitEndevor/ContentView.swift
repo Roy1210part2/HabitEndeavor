@@ -43,11 +43,6 @@ struct IOSContentView: View {
                 .toolbarBackground(Color(.systemBackground), for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
 
-            NavigationStack { QuestView() }
-                .tabItem { Label("퀘스트", systemImage: "trophy.fill") }
-                .toolbarBackground(Color(.systemBackground), for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
-
             NavigationStack { WorldView() }
                 .tabItem { Label("세계", systemImage: "globe") }
                 .toolbarBackground(Color(.systemBackground), for: .navigationBar)
@@ -82,7 +77,6 @@ struct MacContentView: View {
                 case .checkbox: CheckboxView()
                 case .records:  RecordsView()
                 case .schedule: ScheduleView()
-                case .quests:   QuestView()
                 case .world:    WorldView()
                 case .settings: SettingsView()
                 }
@@ -95,7 +89,7 @@ struct MacContentView: View {
 // MARK: - Tab Model
 
 enum AppTab: String, CaseIterable, Identifiable {
-    case checkbox, records, schedule, quests, world, settings
+    case checkbox, records, schedule, world, settings
     var id: String { rawValue }
 
     var title: String {
@@ -103,7 +97,6 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .checkbox: "체크박스"
         case .records:  "기록"
         case .schedule: "일정"
-        case .quests:   "퀘스트"
         case .world:    "세계"
         case .settings: "설정"
         }
@@ -114,7 +107,6 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .checkbox: "square.grid.2x2"
         case .records:  "chart.bar"
         case .schedule: "calendar"
-        case .quests:   "trophy.fill"
         case .world:    "globe"
         case .settings: "gearshape"
         }

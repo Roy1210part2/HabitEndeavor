@@ -38,9 +38,9 @@ struct WorldView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // 3D 지구본 (구매 국가 시각화)
-                GlobeSceneView(ownedCodes: ownedCodes)
-                    .frame(height: 300)
+                // 2D 세계지도 (구매 국가 영토 시각화)
+                WorldMap2DView(ownedCodes: ownedCodes)
+                    .frame(height: 260)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
