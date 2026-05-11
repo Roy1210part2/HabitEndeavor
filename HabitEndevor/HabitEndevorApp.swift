@@ -59,22 +59,33 @@ struct HabitEndeavorApp: App {
             ScheduleItem.self,
         ])
 
-        // CloudKit 동기화 시도 (.automatic은 entitlement에서 컨테이너를 자동 선택)
+        // 1. CloudKit 시도
         let cloudConfig = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .private("iCloud.co.lyu.HabitEndeavor")
         )
-        if let container = try? ModelContainer(for: schema, configurations: [cloudConfig]) {
-            return container
-        }
+        if let c = try? ModelContainer(for: schema, configurations: [cloudConfig]) { return c }
 
-        // CloudKit 미설정 시 로컬 저장소
+        // 2. 로컬 저장소 시도
         let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        if let c = try? ModelContainer(for: schema, configurations: [localConfig]) { return c }
+
+        // 3. 스토어 파일 충돌 복구 — 스키마 변경으로 마이그레이션 불가 시 스토어 초기화
+        //    (개발 중 Bundle ID 변경 or 모델 필드 추가 등으로 발생)
+        let storeURL = localConfig.url
+        let fm = FileManager.default
+        for suffix in ["", "-shm", "-wal"] {
+            try? fm.removeItem(at: URL(fileURLWithPath: storeURL.path + suffix))
+        }
+        if let c = try? ModelContainer(for: schema, configurations: [localConfig]) { return c }
+
+        // 4. 최후 수단: 인메모리 (데이터 유지 안 됨, 비상용)
+        let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
-            return try ModelContainer(for: schema, configurations: [localConfig])
+            return try ModelContainer(for: schema, configurations: [memConfig])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            fatalError("ModelContainer 생성 완전 실패: \(error)")
         }
     }
 }
