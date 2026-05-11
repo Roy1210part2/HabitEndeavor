@@ -67,7 +67,7 @@ struct CheckboxView: View {
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 8) {
                     SunsetIconView(size: 28)
-                    Text("HabitEndeavor")
+                    Text("Habit Endeavor")
                         .font(.system(.headline, design: .rounded))
                         .fontWeight(.bold)
                 }

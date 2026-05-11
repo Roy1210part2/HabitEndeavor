@@ -158,7 +158,7 @@ struct SettingsForm: View {
             Button("설정 열기") { openSystemSettings() }
             Button("취소", role: .cancel) { notificationEnabled = false }
         } message: {
-            Text("시스템 설정에서 HabitEndeavor 알림을 허용해주세요.")
+            Text("시스템 설정에서 Habit Endeavor 알림을 허용해주세요.")
         }
     }
 
@@ -226,7 +226,7 @@ struct SettingsForm: View {
             Button("설정 열기") { openSystemSettings() }
             Button("취소", role: .cancel) { notificationEnabled = false }
         } message: {
-            Text("시스템 설정에서 HabitEndeavor 알림을 허용해주세요.")
+            Text("시스템 설정에서 Habit Endeavor 알림을 허용해주세요.")
         }
     }
     #endif
@@ -255,7 +255,7 @@ struct SettingsForm: View {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: ["daily-report"])
         let content       = UNMutableNotificationContent()
-        content.title     = "HabitEndeavor"
+        content.title     = "Habit Endeavor"
         content.body      = "오늘 습관 체크 하셨나요?"
         content.sound     = .default
         var c             = DateComponents()

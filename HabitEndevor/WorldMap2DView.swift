@@ -12,38 +12,51 @@ struct WorldMap2DView: View {
     }
 }
 
-// MARK: - Cross-platform WebView Wrapper
+// MARK: - Cross-platform WebView
 
 #if os(iOS)
 struct WorldMapWebView: UIViewRepresentable {
     let ownedCodes: Set<String>
+
     func makeUIView(context: Context) -> WKWebView {
         let cfg = WKWebViewConfiguration()
-        cfg.suppressesIncrementalRendering = false
+        cfg.defaultWebpagePreferences.allowsContentJavaScript = true
         let wv = WKWebView(frame: .zero, configuration: cfg)
         wv.isOpaque = false
         wv.backgroundColor = .clear
+        // JS가 pan/zoom을 처리 → 네이티브 스크롤 비활성화
         wv.scrollView.isScrollEnabled = false
         wv.scrollView.bounces = false
+        wv.scrollView.pinchGestureRecognizer?.isEnabled = false
         return wv
     }
+
     func updateUIView(_ wv: WKWebView, context: Context) {
-        wv.loadHTMLString(WorldMapHTML.make(owned: ownedCodes), baseURL: nil)
+        wv.loadHTMLString(WorldMapHTML.make(owned: ownedCodes),
+                          baseURL: URL(string: "about:blank"))
     }
 }
 #else
+// macOS: 명시적 JS 허용 + baseURL 지정이 핵심
 struct WorldMapWebView: NSViewRepresentable {
     let ownedCodes: Set<String>
+
     func makeNSView(context: Context) -> WKWebView {
-        WKWebView()
+        let cfg = WKWebViewConfiguration()
+        cfg.defaultWebpagePreferences.allowsContentJavaScript = true
+        let wv = WKWebView(frame: .zero, configuration: cfg)
+        wv.setValue(false, forKey: "drawsBackground") // 투명 배경
+        return wv
     }
+
     func updateNSView(_ wv: WKWebView, context: Context) {
-        wv.loadHTMLString(WorldMapHTML.make(owned: ownedCodes), baseURL: nil)
+        wv.loadHTMLString(WorldMapHTML.make(owned: ownedCodes),
+                          baseURL: URL(string: "about:blank"))
     }
 }
 #endif
 
-// MARK: - HTML Generator
+// MARK: - HTML + SVG + Zoom/Pan
 
 enum WorldMapHTML {
     static func make(owned: Set<String>) -> String {
@@ -52,14 +65,19 @@ enum WorldMapHTML {
 <!DOCTYPE html>
 <html>
 <head>
-<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1'>
+<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;background:#0B1826;overflow:hidden}
-svg{width:100%;height:100%;display:block}
-.unowned{fill:#1E2D3D;stroke:#0B1826;stroke-width:0.6}
-.owned{stroke:#0B1826;stroke-width:0.6;filter:drop-shadow(0 0 3px currentColor)}
-.bg-land{fill:#182638;stroke:#0B1826;stroke-width:0.4}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;background:#0B1826;overflow:hidden;touch-action:none}
+svg{width:100%;height:100%;display:block;cursor:grab}
+svg.panning{cursor:grabbing}
+#controls{position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:6px;z-index:10}
+.btn{width:34px;height:34px;border:none;border-radius:8px;background:rgba(255,255,255,0.15);
+  color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:background 0.15s}
+.btn:hover{background:rgba(255,255,255,0.28)}
+.btn:active{background:rgba(255,255,255,0.38)}
 </style>
 </head>
 <body>
@@ -71,7 +89,6 @@ svg{width:100%;height:100%;display:block}
     </linearGradient>
   </defs>
   <rect width='1000' height='500' fill='url(#ocean)'/>
-  <!-- 위선/경선 그리드 -->
   <g stroke='#1a2d40' stroke-width='0.4' fill='none'>
     <line x1='0' y1='250' x2='1000' y2='250'/>
     <line x1='500' y1='0' x2='500' y2='500'/>
@@ -82,15 +99,20 @@ svg{width:100%;height:100%;display:block}
   </g>
   <g id='countries'></g>
 </svg>
+
+<div id='controls'>
+  <button class='btn' onclick='zoom(0.7)' title='확대'>+</button>
+  <button class='btn' onclick='zoom(1.4)' title='축소'>−</button>
+  <button class='btn' onclick='resetView()' title='초기화' style='font-size:12px'>⊙</button>
+</div>
+
 <script>
 const owned = new Set([\(ownedJS)]);
-
 const CC = {
-  asia:'#FFB800', europe:'#4488FF',
-  northAmerica:'#FF5544', southAmerica:'#FF8833',
-  africa:'#44CC55', oceania:'#33CCCC'
+  asia:'#FFB800',europe:'#4488FF',
+  northAmerica:'#FF5544',southAmerica:'#FF8833',
+  africa:'#44CC55',oceania:'#33CCCC'
 };
-
 const CM = {
   KR:'asia',JP:'asia',CN:'asia',IN:'asia',TH:'asia',VN:'asia',SG:'asia',
   MY:'asia',ID:'asia',PH:'asia',MN:'asia',NP:'asia',BT:'asia',MV:'asia',
@@ -98,15 +120,11 @@ const CM = {
   DE:'europe',FR:'europe',GB:'europe',IT:'europe',ES:'europe',NL:'europe',
   CH:'europe',SE:'europe',NO:'europe',IS:'europe',LU:'europe',MC:'europe',
   SM:'europe',VA:'europe',LI:'europe',
-  US:'northAmerica',CA:'northAmerica',MX:'northAmerica',
-  CU:'northAmerica',JM:'northAmerica',
-  BR:'southAmerica',AR:'southAmerica',CL:'southAmerica',
-  CO:'southAmerica',PE:'southAmerica',BO:'southAmerica',
+  US:'northAmerica',CA:'northAmerica',MX:'northAmerica',CU:'northAmerica',JM:'northAmerica',
+  BR:'southAmerica',AR:'southAmerica',CL:'southAmerica',CO:'southAmerica',PE:'southAmerica',BO:'southAmerica',
   NG:'africa',ZA:'africa',EG:'africa',KE:'africa',ET:'africa',GH:'africa',SC:'africa',
   AU:'oceania',NZ:'oceania',FJ:'oceania',TV:'oceania',PW:'oceania',NR:'oceania'
 };
-
-// 국가별 간략 폴리곤: [경도, 위도] 배열 (WGS84)
 const C = {
   KR:[[126.0,34.8],[129.0,35.0],[130.9,37.6],[129.5,38.6],[127.8,38.6],[125.1,38.0]],
   JP:[[130.5,31.2],[131.0,33.5],[134.0,34.5],[137.0,36.5],[140.5,36.5],[141.5,38.5],[141.0,41.0],[139.5,41.5],[138.0,39.0],[133.5,35.5],[130.8,33.5]],
@@ -126,7 +144,6 @@ const C = {
   AE:[[51.5,26.0],[56.5,24.5],[56.0,22.0],[51.5,23.0]],
   IL:[[34.0,33.5],[36.0,33.5],[35.5,29.5],[34.0,29.5]],
   TR:[[26.0,42.0],[36.5,42.5],[44.5,39.5],[42.5,37.0],[36.0,36.5],[28.0,37.0],[26.0,38.5]],
-
   DE:[[6.0,55.0],[14.5,54.5],[15.0,51.0],[12.0,48.0],[8.0,47.5],[6.0,51.0]],
   FR:[[-4.5,48.5],[8.5,48.5],[7.5,43.5],[3.0,43.0],[-1.5,43.5],[-4.5,47.5]],
   GB:[[-5.5,58.5],[2.0,56.0],[2.0,51.5],[1.0,51.5],[-1.5,50.5],[-5.5,50.0],[-5.5,52.0],[-4.5,53.5],[-3.0,58.5]],
@@ -142,20 +159,17 @@ const C = {
   SM:[[12.2,44.1],[12.7,44.1],[12.7,43.7],[12.2,43.7]],
   VA:[[12.3,42.0],[12.6,42.0],[12.6,41.8],[12.3,41.8]],
   LI:[[9.3,47.4],[9.8,47.4],[9.8,46.9],[9.3,46.9]],
-
   US:[[-124.5,48.5],[-67.0,47.5],[-67.0,44.5],[-71.0,41.5],[-76.0,35.0],[-80.0,31.5],[-84.0,30.0],[-90.0,29.0],[-94.5,29.0],[-99.5,26.0],[-104.0,20.0],[-109.5,23.0],[-117.0,32.5]],
   CA:[[-141.0,70.0],[-55.0,70.0],[-53.0,47.0],[-67.0,44.5],[-83.5,46.0],[-110.0,49.0],[-122.5,49.0],[-130.0,55.0],[-141.0,59.5]],
   MX:[[-117.0,32.5],[-97.0,22.5],[-90.0,18.0],[-87.5,15.5],[-89.5,15.0],[-92.5,16.0],[-90.5,18.5],[-88.5,20.0],[-90.0,21.5],[-93.5,19.5],[-96.5,19.5],[-100.0,18.0],[-105.0,21.5],[-109.5,23.0]],
   CU:[[-85.0,23.0],[-74.5,20.0],[-75.5,19.5],[-84.5,22.0]],
   JM:[[-78.5,18.5],[-76.0,18.5],[-76.2,17.8],[-78.5,17.8]],
-
   BR:[[-73.5,-2.0],[-52.0,4.5],[-45.0,-1.0],[-35.0,-5.0],[-35.5,-9.0],[-36.5,-14.0],[-39.0,-16.5],[-40.5,-21.5],[-44.0,-23.0],[-48.5,-28.5],[-53.5,-34.0],[-58.0,-34.0],[-62.0,-32.0],[-64.5,-27.5],[-65.5,-22.5],[-62.0,-17.0],[-57.5,-12.5],[-58.0,-7.5],[-65.0,-0.5],[-72.0,-2.5]],
   AR:[[-73.5,-38.0],[-65.0,-23.0],[-62.5,-22.5],[-60.0,-22.5],[-57.5,-28.5],[-55.5,-34.0],[-58.0,-38.5],[-63.0,-42.0],[-66.0,-46.0],[-68.5,-55.5],[-65.5,-55.5],[-60.0,-51.0],[-57.5,-41.5],[-62.5,-38.5],[-66.0,-28.5],[-69.5,-30.5]],
   CL:[[-70.5,-17.5],[-69.5,-30.5],[-72.0,-35.0],[-73.5,-42.0],[-72.5,-50.0],[-69.0,-55.5],[-68.0,-54.5],[-71.5,-50.0],[-74.5,-40.5],[-72.5,-35.0],[-71.0,-27.5]],
   CO:[[-77.0,8.0],[-67.0,7.0],[-67.0,4.0],[-69.5,1.5],[-73.5,-0.5],[-78.0,2.5],[-79.0,7.5]],
   PE:[[-81.5,-1.0],[-78.0,2.5],[-73.5,-0.5],[-70.5,-9.5],[-68.5,-17.5],[-70.5,-18.0],[-75.5,-14.5],[-77.5,-8.0]],
   BO:[[-69.5,-10.0],[-65.5,-10.0],[-62.0,-16.0],[-60.0,-22.5],[-65.0,-23.0],[-69.5,-18.0]],
-
   NG:[[2.5,14.0],[14.5,14.0],[14.5,10.5],[13.5,8.5],[13.0,7.5],[8.5,4.5],[3.5,5.5],[2.5,7.5]],
   ZA:[[16.5,-29.0],[27.5,-23.0],[32.5,-26.5],[32.5,-29.5],[29.5,-30.5],[28.5,-33.5],[26.5,-34.0],[18.5,-34.5],[17.0,-33.0]],
   EG:[[25.0,31.5],[35.0,31.5],[35.0,29.0],[34.0,27.0],[34.0,22.0],[25.0,22.0]],
@@ -163,7 +177,6 @@ const C = {
   ET:[[33.0,15.0],[41.5,15.0],[43.5,11.5],[42.5,6.5],[40.5,4.0],[37.5,5.0],[34.5,8.5],[33.0,11.0]],
   GH:[[-3.5,11.0],[1.5,11.0],[1.5,5.5],[0.0,5.5],[-3.5,7.5]],
   SC:[[54.5,-3.0],[57.0,-3.0],[57.0,-5.5],[54.5,-5.5]],
-
   AU:[[114.0,-22.0],[124.0,-14.5],[132.5,-12.0],[136.0,-12.5],[139.0,-15.0],[142.0,-12.0],[145.0,-14.5],[147.5,-18.5],[149.5,-22.5],[153.5,-29.0],[151.0,-34.0],[150.0,-37.5],[146.5,-39.5],[144.0,-38.5],[141.0,-38.5],[130.0,-33.5],[125.5,-34.5],[114.0,-34.0],[113.5,-26.0]],
   NZ:[[172.5,-34.5],[177.5,-37.5],[175.5,-41.5],[171.5,-40.5]],
   FJ:[[176.5,-16.0],[179.0,-16.0],[179.0,-18.5],[176.5,-18.5]],
@@ -172,50 +185,118 @@ const C = {
   NR:[[166.3,0.7],[167.3,0.7],[167.3,-0.3],[166.3,-0.3]]
 };
 
-function proj(lon, lat) {
-  return [(lon + 180) / 360 * 1000, (90 - lat) / 180 * 500];
-}
+function proj(lon,lat){return[(lon+180)/360*1000,(90-lat)/180*500]}
+function makePath(pts){return pts.map((p,i)=>{const[x,y]=proj(p[0],p[1]);return(i===0?'M':'L')+x.toFixed(1)+','+y.toFixed(1)}).join(' ')+'Z'}
 
-function makePath(pts) {
-  return pts.map((p, i) => {
-    const [x, y] = proj(p[0], p[1]);
-    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ') + 'Z';
-}
+const svg=document.getElementById('map');
+const g=document.getElementById('countries');
 
-const g = document.getElementById('countries');
-
-for (const [code, pts] of Object.entries(C)) {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  el.id = code;
-  el.setAttribute('d', makePath(pts));
-  if (owned.has(code)) {
-    const col = CC[CM[code]] || '#888';
-    el.setAttribute('fill', col);
-    el.setAttribute('stroke', '#0B1826');
-    el.setAttribute('stroke-width', '0.6');
-    el.style.filter = 'drop-shadow(0 0 4px ' + col + ')';
-  } else {
-    el.setAttribute('fill', '#1E2D3D');
-    el.setAttribute('stroke', '#0B1826');
-    el.setAttribute('stroke-width', '0.6');
+for(const[code,pts] of Object.entries(C)){
+  const el=document.createElementNS('http://www.w3.org/2000/svg','path');
+  el.id=code;el.setAttribute('d',makePath(pts));
+  if(owned.has(code)){
+    const col=CC[CM[code]]||'#888';
+    el.setAttribute('fill',col);el.setAttribute('stroke','#0B1826');el.setAttribute('stroke-width','0.6');
+    el.style.filter='drop-shadow(0 0 4px '+col+')';
+  }else{
+    el.setAttribute('fill','#1E2D3D');el.setAttribute('stroke','#0B1826');el.setAttribute('stroke-width','0.6');
   }
   g.appendChild(el);
-
-  // 소유 국가: 중심에 별 마커
-  if (owned.has(code)) {
-    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
-    const [mx, my] = proj(cx, cy);
-    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    dot.setAttribute('cx', mx.toFixed(1));
-    dot.setAttribute('cy', my.toFixed(1));
-    dot.setAttribute('r', '3');
-    dot.setAttribute('fill', 'white');
-    dot.setAttribute('opacity', '0.8');
+  if(owned.has(code)){
+    const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length;
+    const cy=pts.reduce((s,p)=>s+p[1],0)/pts.length;
+    const[mx,my]=proj(cx,cy);
+    const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',mx.toFixed(1));dot.setAttribute('cy',my.toFixed(1));
+    dot.setAttribute('r','3');dot.setAttribute('fill','white');dot.setAttribute('opacity','0.8');
     g.appendChild(dot);
   }
 }
+
+// ── Zoom / Pan ──────────────────────────────────────────────
+let vb={x:0,y:0,w:1000,h:500};
+const MIN_W=100,MAX_W=2000;
+
+function applyVB(){svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)}
+
+function zoom(factor,cx,cy){
+  cx=cx??vb.x+vb.w/2;cy=cy??vb.y+vb.h/2;
+  const nw=Math.max(MIN_W,Math.min(MAX_W,vb.w*factor));
+  const nh=nw*0.5;
+  vb.x=cx-(cx-vb.x)/vb.w*nw;
+  vb.y=cy-(cy-vb.y)/vb.h*nh;
+  vb.w=nw;vb.h=nh;applyVB();
+}
+
+function resetView(){vb={x:0,y:0,w:1000,h:500};applyVB()}
+
+function svgPoint(e){
+  const r=svg.getBoundingClientRect();
+  return{x:(e.clientX-r.left)/r.width*vb.w+vb.x,
+         y:(e.clientY-r.top)/r.height*vb.h+vb.y};
+}
+
+// Mouse wheel zoom
+svg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const pt=svgPoint(e);
+  zoom(e.deltaY>0?1.15:0.87,pt.x,pt.y);
+},{passive:false});
+
+// Mouse drag pan
+let drag=null;
+svg.addEventListener('mousedown',e=>{
+  drag={sx:e.clientX,sy:e.clientY,vbx:vb.x,vby:vb.y};
+  svg.classList.add('panning');
+});
+window.addEventListener('mousemove',e=>{
+  if(!drag)return;
+  const r=svg.getBoundingClientRect();
+  vb.x=drag.vbx-(e.clientX-drag.sx)/r.width*vb.w;
+  vb.y=drag.vby-(e.clientY-drag.sy)/r.height*vb.h;
+  applyVB();
+});
+window.addEventListener('mouseup',()=>{drag=null;svg.classList.remove('panning')});
+
+// Double click zoom-in
+svg.addEventListener('dblclick',e=>{
+  const pt=svgPoint(e);zoom(0.5,pt.x,pt.y);
+});
+
+// Touch pan
+let touch1=null;
+svg.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    touch1={x:e.touches[0].clientX,y:e.touches[0].clientY,vbx:vb.x,vby:vb.y};
+  }else if(e.touches.length===2){
+    touch1=null;
+  }
+},{passive:false});
+
+svg.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&touch1){
+    const r=svg.getBoundingClientRect();
+    vb.x=touch1.vbx-(e.touches[0].clientX-touch1.x)/r.width*vb.w;
+    vb.y=touch1.vby-(e.touches[0].clientY-touch1.y)/r.height*vb.h;
+    applyVB();
+  }else if(e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.hypot(dx,dy);
+    if(touch1&&touch1.pinchDist){
+      const factor=touch1.pinchDist/dist;
+      const cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+      const cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const r=svg.getBoundingClientRect();
+      zoom(factor,(cx-r.left)/r.width*vb.w+vb.x,(cy-r.top)/r.height*vb.h+vb.y);
+    }
+    touch1={pinchDist:dist};
+  }
+},{passive:false});
+
+svg.addEventListener('touchend',e=>{if(e.touches.length===0)touch1=null},{passive:false});
 </script>
 </body>
 </html>
@@ -225,6 +306,6 @@ for (const [code, pts] of Object.entries(C)) {
 
 #Preview {
     WorldMap2DView(ownedCodes: ["KR", "JP", "US", "DE", "AU", "BR"])
-        .frame(height: 260)
+        .frame(height: 280)
         .clipShape(RoundedRectangle(cornerRadius: 20))
 }

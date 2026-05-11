@@ -12,6 +12,7 @@ struct WorldView: View {
     @State private var selectedContinent: Country.Continent? = nil
     @State private var purchaseTarget: Country? = nil
     @State private var searchText = ""
+    @State private var showFullMap = false
 
     private var questCoins: Int { completedQuests.reduce(0) { $0 + $1.coinsAwarded } }
 
@@ -39,14 +40,46 @@ struct WorldView: View {
         ScrollView {
             VStack(spacing: 16) {
                 // 2D 세계지도 (구매 국가 영토 시각화)
-                WorldMap2DView(ownedCodes: ownedCodes)
-                    .frame(height: 260)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
+                ZStack(alignment: .topTrailing) {
+                    WorldMap2DView(ownedCodes: ownedCodes)
+                        .frame(height: 260)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 8)
+
+                    // 전체화면 버튼
+                    Button { showFullMap = true } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(10)
+                }
+                .sheet(isPresented: $showFullMap) {
+                    NavigationStack {
+                        WorldMap2DView(ownedCodes: ownedCodes)
+                            .ignoresSafeArea()
+                            .navigationTitle("세계 지도")
+                            #if os(iOS)
+                            .navigationBarTitleDisplayMode(.inline)
+                            #endif
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("닫기") { showFullMap = false }
+                                }
+                            }
+                    }
+                    #if os(iOS)
+                    .presentationDetents([.large])
+                    #endif
+                }
 
                 coinBalanceCard
                 progressCard
