@@ -135,35 +135,6 @@ struct AddHabitSheet: View {
     }
 }
 
-// ColorPaletteView — 다른 곳에서도 재사용 가능하도록 유지
-
-struct ColorPaletteView: View {
-    @Binding var selectedHex: String
-
-    private let columns = Array(repeating: GridItem(.flexible()), count: 6)
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(habitColorPalette, id: \.self) { hex in
-                let c = Color(hex: hex) ?? .blue
-                let isSelected = selectedHex == hex
-                Circle()
-                    .fill(c)
-                    .frame(height: 36)
-                    .overlay(Circle().stroke(.white, lineWidth: isSelected ? 3 : 0).padding(3))
-                    .overlay(Circle().stroke(c, lineWidth: isSelected ? 2 : 0))
-                    .scaleEffect(isSelected ? 1.15 : 1.0)
-                    .animation(.spring(response: 0.25), value: isSelected)
-                    .onTapGesture {
-                        selectedHex = hex
-                        #if os(iOS)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        #endif
-                    }
-            }
-        }
-    }
-}
 
 #Preview {
     AddHabitSheet(nextSortOrder: 0)

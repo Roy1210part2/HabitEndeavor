@@ -227,7 +227,7 @@ struct CheckboxView: View {
         if let existing = record(for: habit, on: date) {
             if existing.isChecked {
                 existing.isChecked = false
-                if existing.date == Date.todayStart { existing.coinPaidAt = nil }
+                CoinService.revokeIfToday(record: existing) // ① CoinService 위임
             } else {
                 modelContext.delete(existing)
             }
@@ -235,7 +235,7 @@ struct CheckboxView: View {
             let newRecord = HabitRecord(date: date, habit: habit)
             modelContext.insert(newRecord)
             newRecord.isChecked = true
-            if date == Date.todayStart { newRecord.coinPaidAt = Date() }
+            CoinService.awardIfToday(record: newRecord)     // ① CoinService 위임
             justChecked = true
         }
 

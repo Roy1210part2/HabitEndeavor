@@ -11,7 +11,7 @@ struct ScheduleView: View {
     @State private var weekOffset: Int = 0
     @State private var monthOffset: Int = 0
     @State private var selectedDate: Date = Date.todayStart
-    @State private var addingForDate: Date?
+    @State private var addingForDate: IdentifiableDate?
 
     enum ViewMode: String, CaseIterable {
         case weekly = "주간"
@@ -59,8 +59,8 @@ struct ScheduleView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .sheet(item: $addingForDate) { date in
-            AddScheduleSheet(date: date)
+        .sheet(item: $addingForDate) { item in
+            AddScheduleSheet(date: item.date)
         }
     }
 
@@ -91,7 +91,7 @@ struct ScheduleView: View {
                         WeekDayCard(
                             date: date,
                             items: items(for: date),
-                            onAdd: { addingForDate = date }
+                            onAdd: { addingForDate = IdentifiableDate(date) }
                         )
                     }
                 }
@@ -123,7 +123,7 @@ struct ScheduleView: View {
                     SelectedDayPanel(
                         date: selectedDate,
                         items: items(for: selectedDate),
-                        onAdd: { addingForDate = selectedDate }
+                        onAdd: { addingForDate = IdentifiableDate(selectedDate) }
                     )
                     .padding(.horizontal, 16)
                 }
@@ -676,10 +676,12 @@ struct AddScheduleSheet: View {
     }
 }
 
-// MARK: - Date: Identifiable (sheet(item:) 용)
+// MARK: - IdentifiableDate (Date를 전역 Identifiable 확장하는 대신 안전한 래퍼 사용)
 
-extension Date: @retroactive Identifiable {
-    public var id: TimeInterval { timeIntervalSince1970 }
+struct IdentifiableDate: Identifiable {
+    let date: Date
+    var id: TimeInterval { date.timeIntervalSince1970 }
+    init(_ date: Date) { self.date = date }
 }
 
 #Preview {
