@@ -637,28 +637,29 @@ struct HabitMiniCard: View {
     let habit: Habit
     let records: [HabitRecord]
 
-    private var heatmapCells: [DayCellData] {
+    // 🟠 버그 수정: records를 O(n) 선형 탐색 28회 + streak 반복 → dict 1회 빌드로 통합
+    private var processed: (cells: [DayCellData], streak: Int) {
         let cal = Calendar.current
-        return (0..<28).reversed().map { offset in
+        var dict: [Date: HabitRecord] = [:]
+        for r in records { dict[r.date] = r }
+
+        let cells = (0..<28).reversed().map { offset -> DayCellData in
             let date = cal.date(byAdding: .day, value: -offset, to: Date.todayStart)!
-            let rec = records.first { $0.date == date }
+            let rec = dict[date]
             return DayCellData(date: date, mark: rec.map { $0.isChecked ? .checked : .failed } ?? .empty)
         }
-    }
 
-    // records 파라미터를 직접 사용해 정확한 연속기록 계산
-    private var streak: Int {
         var s = 0, day = Date.todayStart
-        let cal = Calendar.current
-        while records.first(where: { $0.date == day })?.isChecked == true {
+        while dict[day]?.isChecked == true {
             s += 1
             day = cal.date(byAdding: .day, value: -1, to: day)!
         }
-        return s
+        return (cells, s)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let p = processed
+        return VStack(alignment: .leading, spacing: 8) {
             // 이름 헤더
             HStack(spacing: 4) {
                 Circle()
@@ -669,15 +670,15 @@ struct HabitMiniCard: View {
                     .lineLimit(1)
                     .foregroundStyle(Color.primary)
                 Spacer(minLength: 0)
-                if streak > 0 {
+                if p.streak > 0 {
                     HStack(spacing: 2) {
                         Image(systemName: "flame.fill").font(.system(size: 10)).foregroundStyle(Color.primary.opacity(0.6))
-                        Text("\(streak)").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.8))
+                        Text("\(p.streak)").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.8))
                     }
                 }
             }
 
-            BentoHeatmap(cells: heatmapCells, accentColor: habit.displayColor)
+            BentoHeatmap(cells: p.cells, accentColor: habit.displayColor)
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.primary.opacity(0.03)))

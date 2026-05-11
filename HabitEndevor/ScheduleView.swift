@@ -377,13 +377,16 @@ struct MonthGrid: View {
         return days
     }
 
-    private func dayItems(_ date: Date) -> [ScheduleItem] {
-        let d = cal.startOfDay(for: date)
-        return allItems.filter { $0.date == d }
+    // 🟠 버그 수정: 셀마다 O(n) 스캔 → dict 1회 빌드 후 O(1) 조회
+    private var itemsByDate: [Date: [ScheduleItem]] {
+        var d: [Date: [ScheduleItem]] = [:]
+        for item in allItems { d[item.date, default: []].append(item) }
+        return d
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        let map = itemsByDate   // body 진입 시 1회 빌드
+        return VStack(spacing: 0) {
             // 요일 헤더
             HStack(spacing: 0) {
                 ForEach(weekdays, id: \.self) { wd in
@@ -402,9 +405,10 @@ struct MonthGrid: View {
             LazyVGrid(columns: cols, spacing: 0) {
                 ForEach(0..<gridDays.count, id: \.self) { i in
                     if let date = gridDays[i] {
+                        let key = cal.startOfDay(for: date)
                         MonthDayCell(
                             date: date,
-                            items: dayItems(date),
+                            items: map[key] ?? [],
                             isSelected: cal.isDate(date, inSameDayAs: selectedDate),
                             isToday: cal.isDateInToday(date)
                         ) {
