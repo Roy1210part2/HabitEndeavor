@@ -75,6 +75,14 @@ struct CheckboxView: View {
                 }
             }
             #if os(iOS)
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    NotificationCenter.default.post(name: .openDailyCheck, object: nil)
+                } label: {
+                    Image(systemName: "checkmark.seal.fill")
+                        .fontWeight(.semibold)
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 EditButton()
             }

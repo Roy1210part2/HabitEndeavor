@@ -1,13 +1,63 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
+
+// MARK: - Notification Name
+
+extension Notification.Name {
+    static let openDailyCheck = Notification.Name("com.habitendeavor.openDailyCheck")
+}
+
+// MARK: - iOS AppDelegate (알림 딥링크 처리)
+
+#if os(iOS)
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    // 알림을 탭했을 때 → daily-report, streak-rescue 모두 DailyHabitCheckSheet로 연결
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let id = response.notification.request.identifier
+        if id == "daily-report" || id == "streak-rescue" {
+            NotificationCenter.default.post(name: .openDailyCheck, object: nil)
+        }
+        completionHandler()
+    }
+
+    // 앱이 포그라운드일 때도 배너 표시
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+}
+#endif
+
+// MARK: - App
 
 @main
 struct HabitEndeavorApp: App {
     var sharedModelContainer: ModelContainer = makeContainer()
 
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #endif
+
+    @State private var showSplash = true
+
     init() {
         #if os(iOS)
-        // 윈도우 배경 = 흰색/다크모드 배경 (safe area 영역 포함 모두 채움)
         UIWindow.appearance().backgroundColor = UIColor.systemBackground
 
         let tabBar = UITabBarAppearance()
@@ -26,8 +76,24 @@ struct HabitEndeavorApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .task { seedSettingsIfNeeded() }
+            ZStack {
+                ContentView()
+                    .opacity(showSplash ? 0 : 1)
+                    .task { seedSettingsIfNeeded() }
+
+                if showSplash {
+                    SplashView()
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
+            }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+                    withAnimation(.easeOut(duration: 0.45)) {
+                        showSplash = false
+                    }
+                }
+            }
         }
         .modelContainer(sharedModelContainer)
     }
@@ -42,12 +108,6 @@ struct HabitEndeavorApp: App {
     }
 
     // MARK: - Container Factory
-    //
-    // iCloud 연동 방법:
-    // 1. Xcode → Target → Signing & Capabilities → + Capability → iCloud
-    // 2. CloudKit 체크박스 활성화
-    // 3. Containers에 "iCloud.co.lyu.HabitEndeavor" 추가
-    // 위 설정이 없으면 자동으로 로컬 저장소로 폴백됩니다.
 
     private static func makeContainer() -> ModelContainer {
         let schema = Schema([
@@ -59,7 +119,6 @@ struct HabitEndeavorApp: App {
             ScheduleItem.self,
         ])
 
-        // 1. CloudKit 시도
         let cloudConfig = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
@@ -67,12 +126,10 @@ struct HabitEndeavorApp: App {
         )
         if let c = try? ModelContainer(for: schema, configurations: [cloudConfig]) { return c }
 
-        // 2. 로컬 저장소 시도
         let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         if let c = try? ModelContainer(for: schema, configurations: [localConfig]) { return c }
 
-        // 3. 스토어 파일 충돌 복구 — 스키마 변경으로 마이그레이션 불가 시 스토어 초기화
-        //    (개발 중 Bundle ID 변경 or 모델 필드 추가 등으로 발생)
+        // 스키마 변경으로 마이그레이션 불가 시 (개발 중)
         let storeURL = localConfig.url
         let fm = FileManager.default
         for suffix in ["", "-shm", "-wal"] {
@@ -80,7 +137,6 @@ struct HabitEndeavorApp: App {
         }
         if let c = try? ModelContainer(for: schema, configurations: [localConfig]) { return c }
 
-        // 4. 최후 수단: 인메모리 (데이터 유지 안 됨, 비상용)
         let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         do {
             return try ModelContainer(for: schema, configurations: [memConfig])

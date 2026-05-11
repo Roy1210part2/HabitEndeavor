@@ -26,6 +26,8 @@ struct ContentView: View {
 
 #if os(iOS)
 struct IOSContentView: View {
+    @State private var showDailyCheck = false
+
     var body: some View {
         TabView {
             NavigationStack { CheckboxView() }
@@ -55,6 +57,12 @@ struct IOSContentView: View {
         }
         .toolbarBackground(Color(.systemBackground), for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
+        .sheet(isPresented: $showDailyCheck) {
+            DailyHabitCheckSheet()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openDailyCheck)) { _ in
+            showDailyCheck = true
+        }
     }
 }
 #endif

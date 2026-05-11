@@ -256,7 +256,7 @@ struct SettingsForm: View {
         center.removePendingNotificationRequests(withIdentifiers: ["daily-report"])
         let content       = UNMutableNotificationContent()
         content.title     = "Habit Endeavor"
-        content.body      = "오늘 습관 체크 하셨나요?"
+        content.body      = "오늘 습관을 체크해보세요! 탭하면 바로 확인할 수 있어요 ✅"
         content.sound     = .default
         var c             = DateComponents()
         c.hour            = settings.notificationHour
