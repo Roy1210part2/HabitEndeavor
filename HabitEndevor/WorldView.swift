@@ -1,6 +1,30 @@
 import SwiftUI
 import SwiftData
 
+// TODO: 세계 지도 & 국가 구매 시스템 — 나중에 구체화 예정 (현재 비활성화)
+
+struct WorldView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "globe")
+                .font(.system(size: 60))
+                .foregroundStyle(Color.secondary)
+            Text("세계 지도")
+                .font(.system(.title2, design: .rounded))
+                .fontWeight(.bold)
+            Text("준비 중이에요")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("세계")
+    }
+}
+
+/*
+import SwiftUI
+import SwiftData
+
 struct WorldView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
@@ -420,3 +444,4 @@ struct CountryPurchaseSheet: View {
     NavigationStack { WorldView() }
         .modelContainer(for: [HabitRecord.self, PurchasedCountry.self, Habit.self], inMemory: true)
 }
+*/

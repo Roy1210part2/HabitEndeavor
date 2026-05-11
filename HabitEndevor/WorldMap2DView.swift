@@ -1,4 +1,15 @@
 import SwiftUI
+
+// TODO: 세계 지도 — 나중에 구체화 예정 (현재 비활성화)
+// 아래 주석을 해제하면 지도 기능이 복원됩니다.
+
+struct WorldMap2DView: View {
+    let ownedCodes: Set<String>
+    var body: some View { EmptyView() }
+}
+
+/*
+import SwiftUI
 import WebKit
 
 // MARK: - Public View
@@ -309,3 +320,4 @@ svg.addEventListener('touchend',e=>{if(e.touches.length===0)touch1=null},{passiv
         .frame(height: 280)
         .clipShape(RoundedRectangle(cornerRadius: 20))
 }
+*/

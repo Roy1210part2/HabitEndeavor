@@ -1,5 +1,34 @@
 import Foundation
 import SwiftData
+import SwiftUI
+
+// TODO: 퀘스트 시스템 — 나중에 구체화 예정
+// CompletedQuest 모델은 SwiftData 스키마 호환성 유지를 위해 살려둠
+
+@Model
+final class CompletedQuest {
+    var questID: String
+    var completedAt: Date
+    var coinsAwarded: Int
+    init(questID: String, coinsAwarded: Int) {
+        self.questID = questID
+        self.completedAt = Date()
+        self.coinsAwarded = coinsAwarded
+    }
+}
+
+// QuestService 스텁 (CheckboxView 호환성 유지, 기능 비활성화)
+struct QuestService {
+    static func checkAndComplete(
+        habits: [Habit], allRecords: [HabitRecord],
+        completedQuests: [CompletedQuest], purchases: [PurchasedCountry],
+        context: ModelContext
+    ) { /* 비활성화 — 퀘스트 시스템 구체화 후 복원 */ }
+}
+
+/*
+import Foundation
+import SwiftData
 
 // MARK: - Completed Quest (persisted)
 
@@ -175,3 +204,4 @@ struct QuestService {
         }
     }
 }
+*/

@@ -1,4 +1,27 @@
 import SwiftUI
+
+// TODO: 퀘스트 시스템 — 나중에 사용자와 함께 구체화 예정 (현재 비활성화)
+
+struct QuestView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "trophy")
+                .font(.system(size: 60))
+                .foregroundStyle(Color.secondary)
+            Text("퀘스트")
+                .font(.system(.title2, design: .rounded))
+                .fontWeight(.bold)
+            Text("준비 중이에요")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("퀘스트")
+    }
+}
+
+/*
+import SwiftUI
 import SwiftData
 
 struct QuestView: View {
@@ -245,3 +268,4 @@ struct QuestCard: View {
     NavigationStack { QuestView() }
         .modelContainer(for: [Habit.self, HabitRecord.self, CompletedQuest.self, PurchasedCountry.self], inMemory: true)
 }
+*/
